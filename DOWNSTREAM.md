@@ -129,3 +129,31 @@ display currency.
   (1 message key), `web/src/features/system-settings/{types.ts,billing/index.tsx,billing/section-registry.tsx}`,
   `web/src/features/wallet/index.tsx`, `web/src/features/system-info/constants.ts`,
   `web/src/i18n/locales/*.json`.
+
+## Global service_tier rejection (2026-09-21)
+
+Codex CLI Fast mode sends `service_tier: "priority"` (OpenAI treats `fast` and
+`priority` as the same tier). Upstream only strips `service_tier` per channel
+(`RemoveDisabledFields`, channel setting `allow_service_tier`); it never tells
+the client. This fork adds a global request policy that rejects such requests
+with HTTP 400 `invalid_request` before a channel is selected, so no retry,
+no pre-consume and no channel-health impact.
+
+- **Check point**: top of `relay.PrepareRequestBilling` (`relay/request_billing.go`),
+  reached by `controller.Relay` for Chat Completions, Responses, Responses
+  compact, Claude Messages and the playground, and by the Responses WebSocket
+  runner. The incoming DTO is inspected before any protocol conversion, so
+  pass-through mode and Chat→Responses conversion are covered. Claude
+  `speed: "fast"` is out of scope.
+- **Setting**: `setting/operation_setting/service_tier_policy_setting.go`,
+  section `service_tier_policy` with `reject_enabled` (default `false`) and
+  `blocked_tiers` (newline separated, case-insensitive, default
+  `fast\npriority`). Both keys are request-policy options
+  (`model/request_policy.go` allowlist + boolean validation) and are saved
+  through `PATCH /api/option/request_policy`.
+- **UI**: System settings → Request policies → new "Service tier" sub-page
+  (`web/src/features/system-settings/request-policies/service-tier-section.tsx`,
+  registered in `section-registry.tsx`, defaults in `defaults.ts`).
+- Upstream files touched (append-only): `model/request_policy.go`,
+  `relay/request_billing.go`, `web/src/features/system-settings/request-policies/{defaults.ts,section-registry.tsx}`,
+  `web/src/i18n/locales/*.json`, plus the corresponding existing test files.

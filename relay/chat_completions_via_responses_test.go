@@ -16,6 +16,8 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/relayconvert"
 	relaytypes "github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -274,6 +276,70 @@ func TestApplySystemPromptIfNeededSkipsToolLoadingMessages(t *testing.T) {
 			}
 			_, overrideSet := common.GetContextKey(c, constant.ContextKeySystemPromptOverride)
 			assert.Equal(t, tt.wantOverride, overrideSet)
+		})
+	}
+}
+
+func TestPrepareRequestBillingRejectsBlockedServiceTier(t *testing.T) {
+	policy := operation_setting.GetServiceTierPolicySetting()
+	previous := *policy
+	t.Cleanup(func() { *policy = previous })
+	policy.RejectEnabled = true
+	policy.BlockedTiers = "fast\npriority\nflex"
+
+	newContext := func(path string) *gin.Context {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, path, nil)
+		return c
+	}
+
+	for _, tc := range []struct {
+		name    string
+		path    string
+		request dto.Request
+	}{
+		{name: "chat completions raw fast", path: "/v1/chat/completions", request: &dto.GeneralOpenAIRequest{Model: "gpt-4o", ServiceTier: json.RawMessage(`"fast"`)}},
+		{name: "chat completions raw priority with case and spaces", path: "/v1/chat/completions", request: &dto.GeneralOpenAIRequest{Model: "gpt-4o", ServiceTier: json.RawMessage(`" PRIORITY "`)}},
+		{name: "responses priority sent by codex fast mode", path: "/v1/responses", request: &dto.OpenAIResponsesRequest{Model: "gpt-5-codex", ServiceTier: "priority"}},
+		{name: "responses compaction fast", path: "/v1/responses/compact", request: &dto.OpenAIResponsesCompactionRequest{Model: "gpt-5-codex", ServiceTier: "Fast"}},
+		{name: "claude messages custom blocked tier", path: "/v1/messages", request: &dto.ClaudeRequest{Model: "claude-sonnet", ServiceTier: "flex"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newContext(tc.path)
+			apiErr := PrepareRequestBilling(c, &relaycommon.RelayInfo{Request: tc.request})
+			require.NotNil(t, apiErr)
+			assert.Equal(t, http.StatusBadRequest, apiErr.StatusCode)
+			assert.Equal(t, relaytypes.ErrorCodeInvalidRequest, apiErr.GetErrorCode())
+			assert.True(t, relaytypes.IsSkipRetryError(apiErr), "a policy rejection must not trigger channel retries")
+			assert.Contains(t, apiErr.Error(), "service_tier")
+			events := service.RequestPolicy(c).Events()
+			require.Len(t, events, 1)
+			assert.Equal(t, service.PolicyDecision{Action: "stop", Reason: "local_rejection", Source: "global"}, events[0].Decision)
+			assert.Equal(t, "unchanged", events[0].Health)
+		})
+	}
+
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+		request dto.Request
+	}{
+		{name: "toggle disabled lets fast through", enabled: false, request: &dto.OpenAIResponsesRequest{Model: "unpriced-service-tier-model", ServiceTier: "fast"}},
+		{name: "unlisted tier passes", enabled: true, request: &dto.OpenAIResponsesRequest{Model: "unpriced-service-tier-model", ServiceTier: "default"}},
+		{name: "absent tier passes", enabled: true, request: &dto.ClaudeRequest{Model: "unpriced-service-tier-model"}},
+		{name: "non-string raw tier never matches", enabled: true, request: &dto.GeneralOpenAIRequest{Model: "unpriced-service-tier-model", ServiceTier: json.RawMessage(`{"fast":true}`)}},
+		{name: "null raw tier never matches", enabled: true, request: &dto.GeneralOpenAIRequest{Model: "unpriced-service-tier-model", ServiceTier: json.RawMessage(`null`)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			policy.RejectEnabled = tc.enabled
+			c := newContext("/v1/chat/completions")
+			// The model has no configured price, so billing stops at the pricing
+			// step without reaching the database; only the policy outcome matters here.
+			apiErr := PrepareRequestBilling(c, &relaycommon.RelayInfo{Request: tc.request})
+			if apiErr != nil {
+				assert.NotEqual(t, relaytypes.ErrorCodeInvalidRequest, apiErr.GetErrorCode())
+			}
+			assert.Empty(t, service.RequestPolicy(c).Events(), "no policy rejection must be recorded")
 		})
 	}
 }

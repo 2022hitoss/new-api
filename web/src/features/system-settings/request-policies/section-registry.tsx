@@ -21,6 +21,7 @@ import { ChannelHealthSection } from './channel-health-section'
 import type { RequestPolicySettings } from './defaults'
 import { RequestChecksSection } from './request-checks-section'
 import { RoutingPolicySection } from './routing-section'
+import { ServiceTierSection } from './service-tier-section'
 
 const POLICY_SECTIONS = [
   {
@@ -46,6 +47,20 @@ const POLICY_SECTIONS = [
     titleKey: 'Channel health',
     build: (settings: RequestPolicySettings) => (
       <ChannelHealthSection defaultValues={settings} />
+    ),
+  },
+  {
+    id: 'service-tier',
+    titleKey: 'Service tier',
+    build: (settings: RequestPolicySettings) => (
+      <ServiceTierSection
+        defaultValues={{
+          'service_tier_policy.reject_enabled':
+            settings['service_tier_policy.reject_enabled'],
+          'service_tier_policy.blocked_tiers':
+            settings['service_tier_policy.blocked_tiers'],
+        }}
+      />
     ),
   },
 ] as const
