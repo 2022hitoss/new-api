@@ -2,19 +2,80 @@ name: Publish Docker image (Multi-arch)
 
 on:
   push:
-    tags:
-      - '*'
-      - '!nightly*'
+    branches:
+      - main
+  # 手动触发时在 "Use workflow from" 下拉里选分支即可，无需填写 tag
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag name to build (e.g., v0.10.8-alpha.3)'
-        required: true
-        type: string
+
+# 同一个 ref 的构建不要并发；分支上的旧构建被新提交取代时直接取消
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
 
 jobs:
+  prepare:
+    name: Resolve image tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+      version: ${{ steps.resolve.outputs.version }}
+      tags: ${{ steps.resolve.outputs.tags }}
+
+    steps:
+      # 统一在这里算一次版本号，避免两个架构分别取时间戳而落在不同日期上
+      - name: Resolve image name and tags
+        id: resolve
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+        run: |
+          set -euo pipefail
+
+          IMAGE="ghcr.io/$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/new-api"
+
+          SLUG="$(printf '%s' "$REF_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^[.-]+//; s/[.-]+$//')"
+          SLUG="${SLUG:0:105}"
+          SLUG="$(printf '%s' "$SLUG" | sed -E 's/[.-]+$//')"
+          if [ -z "$SLUG" ]; then
+            echo "::error::Ref '${REF_NAME}' cannot be converted to a valid Docker tag"
+            exit 1
+          fi
+
+          if [ "$REF_TYPE" = "tag" ]; then
+            # tag 本身已经唯一，直接用
+            VERSION="$SLUG"
+            TAGS="$SLUG"
+          else
+            VERSION="${SLUG}-$(date -u +'%Y%m%d')-${GITHUB_SHA:0:7}"
+            # 分支名是滚动标签，版本号是这次提交的固定标签
+            TAGS="$(printf '%s\n%s' "$SLUG" "$VERSION")"
+          fi
+
+          # latest 只跟随默认分支和正式 tag，特性分支的手动构建不会覆盖它
+          if [ "$REF_TYPE" = "tag" ] || [ "$REF_NAME" = "$DEFAULT_BRANCH" ]; then
+            TAGS="$(printf '%s\nlatest' "$TAGS")"
+          fi
+
+          echo "Image:   ${IMAGE}"
+          echo "Version: ${VERSION}"
+          echo "Tags:"
+          printf '  %s\n' $TAGS
+
+          {
+            echo "image=${IMAGE}"
+            echo "version=${VERSION}"
+            echo "tags<<__TAGS__"
+            printf '%s\n' "$TAGS"
+            echo "__TAGS__"
+          } >> "$GITHUB_OUTPUT"
+
   build_single_arch:
     name: Build & push (${{ matrix.arch }})
+    needs: [prepare]
     strategy:
       fail-fast: false
       matrix:
@@ -26,9 +87,6 @@ jobs:
             platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      image: ${{ steps.version.outputs.image }}
 
     permissions:
       packages: write
@@ -38,31 +96,28 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && 0 || 1 }}
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Resolve tag & write VERSION
-        id: version
+      - name: Write VERSION and per-arch tags
+        id: arch_tags
         env:
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAGS: ${{ needs.prepare.outputs.tags }}
         run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-            if ! git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
-              echo "::error::Tag '$TAG' does not exist"
-              exit 1
-            fi
-          else
-            TAG=${GITHUB_REF#refs/tags/}
-          fi
-          IMAGE="ghcr.io/$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/new-api"
-          echo "TAG=${TAG}" >> $GITHUB_ENV
-          echo "IMAGE=${IMAGE}" >> $GITHUB_ENV
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
-          echo "${TAG}" > VERSION
-          echo "Building tag: ${TAG} for ${{ matrix.arch }} as ${IMAGE}"
+          set -euo pipefail
+
+          echo "${VERSION}" > VERSION
+          echo "Building ${VERSION} for ${{ matrix.arch }}"
+
+          # 每个 manifest 标签都要有对应的单架构标签，供后面合成 manifest 使用
+          {
+            echo "list<<__ARCH_TAGS__"
+            while IFS= read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "${IMAGE}:${tag}-${{ matrix.arch }}"
+            done <<< "$TAGS"
+            echo "__ARCH_TAGS__"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -78,7 +133,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ needs.prepare.outputs.image }}
 
       - name: Build & push
         id: build
@@ -87,9 +142,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
-            ${{ env.IMAGE }}:latest-${{ matrix.arch }}
+          tags: ${{ steps.arch_tags.outputs.list }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -100,21 +153,26 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Sign image with cosign
-        run: cosign sign --yes ${IMAGE}@${{ steps.build.outputs.digest }}
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+        run: cosign sign --yes "${IMAGE}@${{ steps.build.outputs.digest }}"
 
       - name: Image summary
+        env:
+          ARCH_TAGS: ${{ steps.arch_tags.outputs.list }}
         run: |
-          echo "### Docker Image Digest (${{ matrix.arch }})" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${IMAGE}:${TAG}-${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Docker image (${{ matrix.arch }})"
+            echo '```'
+            printf '%s\n' "$ARCH_TAGS"
+            echo "${{ steps.build.outputs.digest }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   create_manifests:
     name: Create multi-arch manifests
-    needs: [build_single_arch]
+    needs: [prepare, build_single_arch]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
 
     permissions:
       packages: write
@@ -122,11 +180,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: Set version
-        run: |
-          echo "TAG=${{ needs.build_single_arch.outputs.tag }}" >> $GITHUB_ENV
-          echo "IMAGE=${{ needs.build_single_arch.outputs.image }}" >> $GITHUB_ENV
-
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
         with:
@@ -134,31 +187,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create & push manifest (version)
-        run: |
-          docker buildx imagetools create \
-            -t ${IMAGE}:${TAG} \
-            ${IMAGE}:${TAG}-amd64 \
-            ${IMAGE}:${TAG}-arm64
-
-      - name: Create & push manifest (latest)
-        run: |
-          docker buildx imagetools create \
-            -t ${IMAGE}:latest \
-            ${IMAGE}:latest-amd64 \
-            ${IMAGE}:latest-arm64
-
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: Sign manifests with cosign
+      - name: Create, push and sign manifests
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          TAGS: ${{ needs.prepare.outputs.tags }}
         run: |
-          cosign sign --yes ${IMAGE}:${TAG}
-          cosign sign --yes ${IMAGE}:latest
+          set -euo pipefail
+
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            docker buildx imagetools create \
+              -t "${IMAGE}:${tag}" \
+              "${IMAGE}:${tag}-amd64" \
+              "${IMAGE}:${tag}-arm64"
+            cosign sign --yes "${IMAGE}:${tag}"
+          done <<< "$TAGS"
 
       - name: Manifest summary
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          TAGS: ${{ needs.prepare.outputs.tags }}
         run: |
-          echo "### Multi-arch Manifest" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          docker buildx imagetools inspect ${IMAGE}:${TAG} >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Multi-arch manifests"
+            echo '```'
+            while IFS= read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "${IMAGE}:${tag}"
+            done <<< "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
