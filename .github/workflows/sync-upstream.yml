@@ -1,0 +1,198 @@
+name: Sync upstream release
+
+on:
+  # 手动触发，用于验证或临时补一次同步
+  workflow_dispatch:
+    inputs:
+      include_prerelease:
+        description: 'Also sync upstream pre-releases (alpha/beta)'
+        required: false
+        default: false
+        type: boolean
+
+  # 每天 03:17 UTC（北京时间 11:17）检查一次上游 release
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# 两次同步不要并发跑，否则可能重复建分支
+concurrency:
+  group: sync-upstream-release
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPOSITORY: QuantumNous/new-api
+
+jobs:
+  sync:
+    name: Open sync PR for the latest upstream release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout downstream main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+          # 必须用 PAT：内置 GITHUB_TOKEN 没有 workflow scope，上游 release 只要
+          # 动过 .github/workflows/ 下的文件，推送 sync 分支就会被拒绝。
+          # 另外 GITHUB_TOKEN 创建的 PR 不会触发 ci.yml，auto merge 会永远等不到检查。
+          token: ${{ secrets.UPSTREAM_SYNC_PAT }}
+
+      - name: Fetch upstream tags
+        run: |
+          set -euo pipefail
+          git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch upstream --tags --force
+          git fetch origin main
+
+      - name: Find latest upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_PAT }}
+          INCLUDE_PRERELEASE: ${{ inputs.include_prerelease || 'false' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$INCLUDE_PRERELEASE" = "true" ]; then
+            jq_filter='[.[] | select(.draft == false)][0].tag_name'
+          else
+            jq_filter='[.[] | select(.draft == false and .prerelease == false)][0].tag_name'
+          fi
+
+          TAG="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases?per_page=30" --jq "$jq_filter")"
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "::error::No matching upstream release found (include_prerelease=${INCLUDE_PRERELEASE})"
+            exit 1
+          fi
+
+          # release 的 tag 必须已经随 git fetch --tags 拉到本地，否则无法定位提交
+          if ! TAG_COMMIT="$(git rev-parse -q --verify "refs/tags/${TAG}^{commit}")"; then
+            echo "::error::Upstream release ${TAG} has no matching tag object in ${UPSTREAM_REPOSITORY}"
+            exit 1
+          fi
+
+          SAFE_TAG="${TAG//\//-}"
+
+          echo "Latest upstream release: ${TAG} (${TAG_COMMIT})"
+          {
+            echo "tag=${TAG}"
+            echo "tag_commit=${TAG_COMMIT}"
+            echo "branch=sync/${SAFE_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check whether the release is already in main
+        id: state
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          TAG_COMMIT: ${{ steps.release.outputs.tag_commit }}
+        run: |
+          set -euo pipefail
+
+          # sync PR 以 merge commit 方式合入时，上游 tag 提交会成为 main 的祖先。
+          # 如果改用 squash / rebase 合并，这个判断会一直为假并反复建 PR。
+          if git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+            echo "${TAG} is already contained in main."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "${TAG} has not been merged yet."
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # sync 分支直接指向上游 release 提交，真正的合并交给 PR 完成，
+      # 冲突会以「PR 不可合并」的形式暴露出来，由人工处理。
+      - name: Create or reuse the sync pull request
+        if: steps.state.outputs.needed == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_PAT }}
+          TAG: ${{ steps.release.outputs.tag }}
+          TAG_COMMIT: ${{ steps.release.outputs.tag_commit }}
+          BRANCH: ${{ steps.release.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          PR_URL="$(gh pr list \
+            -R "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --state open \
+            --json url \
+            --jq '.[0].url // ""')"
+
+          if [ -n "$PR_URL" ]; then
+            echo "Reusing existing pull request: ${PR_URL}"
+            echo "url=${PR_URL}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git push --force origin "${TAG_COMMIT}:refs/heads/${BRANCH}"
+
+          body_file="${RUNNER_TEMP}/upstream-sync-pr.md"
+          cat > "$body_file" <<EOF
+          Automated upstream synchronization.
+
+          | | |
+          | --- | --- |
+          | Upstream repository | \`${UPSTREAM_REPOSITORY}\` |
+          | Upstream release | \`${TAG}\` |
+          | Upstream commit | \`${TAG_COMMIT}\` |
+
+          This PR merges the upstream release into the downstream \`main\` branch.
+          Opened by the \`Sync upstream release\` workflow; no human reviewed the diff.
+
+          Conflicts are expected in files this fork customizes
+          (\`.github/workflows/release.yml\`, \`.github/workflows/docker-build.yml\`,
+          see \`DOWNSTREAM.md\`) and must be resolved by hand.
+
+          Merge this PR with a **merge commit**. Squash or rebase would leave the
+          upstream tag commit out of \`main\`'s history and the workflow would keep
+          reopening this PR.
+          EOF
+
+          PR_URL="$(gh pr create \
+            -R "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore: sync upstream ${TAG}" \
+            --body-file "$body_file")"
+
+          echo "Created pull request: ${PR_URL}"
+          echo "url=${PR_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto merge
+        if: steps.state.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_PAT }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          set -euo pipefail
+
+          # 需要仓库开启 Allow auto-merge，并给 main 配置必需状态检查；
+          # 两者缺一，这里要么报错，要么会立刻合并而不等 CI。
+          if ! gh pr merge "$PR_URL" -R "$GITHUB_REPOSITORY" --auto --merge --delete-branch; then
+            echo "::warning::Could not enable auto merge for ${PR_URL}. Check that 'Allow auto-merge' is on and that main has required status checks. The pull request itself was created and can be merged by hand."
+          fi
+
+      - name: Summary
+        if: always()
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          NEEDED: ${{ steps.state.outputs.needed }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          {
+            echo "### Upstream sync"
+            echo ""
+            echo "- Upstream repository: \`${UPSTREAM_REPOSITORY}\`"
+            echo "- Latest release: \`${TAG:-unknown}\`"
+            if [ "${NEEDED:-}" = "true" ]; then
+              echo "- Pull request: ${PR_URL:-not created}"
+            else
+              echo "- Already contained in \`main\`, nothing to do."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
