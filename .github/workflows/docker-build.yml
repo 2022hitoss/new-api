@@ -144,8 +144,12 @@ jobs:
           push: true
           tags: ${{ steps.arch_tags.outputs.list }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # 每个架构用独立的缓存 scope：两个架构的层本就不同，共用 scope 会让它们
+          # 并发写同一份缓存并驱逐对方正在写的 blob（表现为 error writing layer
+          # blob: not_found）。ignore-error 保证缓存导出失败不会让已经推送成功的
+          # 镜像构建变成失败。
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }},ignore-error=true
           provenance: mode=max
           sbom: true
 

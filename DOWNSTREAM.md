@@ -36,3 +36,13 @@ is now driven by branches:
   - tag push (kept working, unused today) → `<tag>`, `latest`
 - A `prepare` job resolves the image name and tag list once, so both architectures
   agree on the timestamp and the manifest job reuses the same list.
+
+## Build cache scoped per architecture (2026-09-21)
+
+The first real GHCR build failed on amd64 with
+`error writing layer blob: not_found` while exporting to the GitHub Actions
+cache, after the image itself had already been pushed. Both matrix legs wrote
+to the same default `type=gha` scope concurrently and evicted each other's
+blobs. `.github/workflows/docker-build.yml` now uses
+`scope=<arch>` on both `cache-from` and `cache-to`, plus `ignore-error=true`
+so a cache export failure cannot fail a build whose image push succeeded.
