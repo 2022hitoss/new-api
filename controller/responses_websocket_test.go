@@ -27,6 +27,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -1286,7 +1287,14 @@ func TestResponsesWebSocketPreRoutingRejectionsFollowHealthClassification(t *tes
 		reject  func(*testing.T, *responsesWSBillingTest)
 		status  int
 		sampled bool
+		body    string
 	}{
+		{name: "blocked service tier", status: http.StatusBadRequest, body: `{"type":"response.create","model":"ws-billing","input":"hi","service_tier":"priority"}`, reject: func(t *testing.T, fixture *responsesWSBillingTest) {
+			policy := operation_setting.GetServiceTierPolicySetting()
+			previous := *policy
+			t.Cleanup(func() { *policy = previous })
+			policy.RejectEnabled = true
+		}},
 		{name: "no eligible channel", status: http.StatusServiceUnavailable, sampled: true, reject: func(t *testing.T, fixture *responsesWSBillingTest) {
 			require.NoError(t, model.DB.Model(&model.Ability{}).Where("channel_id = ?", fixture.channel.Id).Update("enabled", false).Error)
 		}},
@@ -1302,7 +1310,11 @@ func TestResponsesWebSocketPreRoutingRejectionsFollowHealthClassification(t *tes
 				t.Error("rejected request reached upstream")
 			})
 			tc.reject(t, fixture)
-			require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+			body := tc.body
+			if body == "" {
+				body = `{"type":"response.create","model":"ws-billing","input":"hi"}`
+			}
+			require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(body)))
 			rejected := readResponsesWSTestEvent(t, fixture.client)
 			assert.Equal(t, "error", rejected["type"])
 			assert.Equal(t, float64(tc.status), rejected["status"])

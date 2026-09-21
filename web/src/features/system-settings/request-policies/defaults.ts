@@ -41,9 +41,14 @@ export type FilteringSettings = Pick<
   SecuritySettings,
   'CheckSensitiveEnabled' | 'CheckSensitiveOnPromptEnabled' | 'SensitiveWords'
 >
+export type ServiceTierPolicySettings = {
+  'service_tier_policy.reject_enabled': boolean
+  'service_tier_policy.blocked_tiers': string
+}
 export type RequestPolicySettings = RetrySettings &
   HealthSettings &
   FilteringSettings &
+  ServiceTierPolicySettings &
   Pick<ChannelAffinitySettings, keyof ChannelAffinitySettings>
 
 export const defaultRequestPolicySettings: RequestPolicySettings = {
@@ -69,4 +74,6 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   CheckSensitiveEnabled: false,
   CheckSensitiveOnPromptEnabled: false,
   SensitiveWords: '',
+  'service_tier_policy.reject_enabled': false,
+  'service_tier_policy.blocked_tiers': 'fast\npriority',
 }

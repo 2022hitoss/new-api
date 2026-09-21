@@ -192,6 +192,7 @@ describe('request policy settings', () => {
     ['health', 'Save Changes'],
     ['filtering', 'Save sensitive words'],
     ['affinity', 'Save Changes'],
+    ['service-tier', 'Save Changes'],
   ])(
     'opening %s and saving unchanged values does not write options',
     async (section, saveLabel) => {
@@ -249,6 +250,48 @@ describe('request policy settings', () => {
       expect(api.patch).toHaveBeenCalledExactlyOnceWith(
         '/api/option/request_policy',
         { options: { CheckSensitiveEnabled: 'false' } }
+      )
+    )
+  })
+
+  it('enabling service tier blocking writes only the toggle option', async () => {
+    await renderPolicies('/system-settings/request-policies/service-tier')
+    expect(
+      await screen.findByText(
+        'Service tier blocking needs the switch enabled and a non-empty blocked list.'
+      )
+    ).toBeVisible()
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Reject blocked service tiers' })
+    )
+    expect(
+      screen.getByText(
+        'Service tier blocking is active with the current form values.'
+      )
+    ).toBeVisible()
+    expect(
+      screen.getByRole('textbox', { name: 'Blocked service tiers' })
+    ).toHaveValue('fast\npriority')
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledExactlyOnceWith(
+        '/api/option/request_policy',
+        { options: { 'service_tier_policy.reject_enabled': 'true' } }
+      )
+    )
+  })
+
+  it('editing the blocked service tier list writes only the list option', async () => {
+    await renderPolicies('/system-settings/request-policies/service-tier')
+    const tiers = await screen.findByRole('textbox', {
+      name: 'Blocked service tiers',
+    })
+    fireEvent.change(tiers, { target: { value: 'priority\nflex' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledExactlyOnceWith(
+        '/api/option/request_policy',
+        { options: { 'service_tier_policy.blocked_tiers': 'priority\nflex' } }
       )
     )
   })
@@ -356,6 +399,7 @@ describe('request policy settings', () => {
     ['/system-settings/operations/monitoring', 'health'],
     ['/system-settings/request-policies/', 'routing'],
     ['/system-settings/request-policies/unknown', 'routing'],
+    ['/system-settings/request-policies/service-tier', 'service-tier'],
   ])('%s opens the corresponding policy page', async (path, section) => {
     const router = await renderPolicies(path)
     await waitFor(() =>

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -14,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 )
@@ -22,6 +24,28 @@ import (
 // provide the current request body through BodyStorage or BillingRequestInput;
 // channel retries retain the resulting billing session and pricing snapshot.
 func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.NewAPIError {
+	if policy := operation_setting.GetServiceTierPolicySetting(); policy.RejectEnabled {
+		// Read the incoming DTO before any protocol conversion: Chat -> Responses
+		// conversion drops service_tier, and pass-through mode still parses the DTO.
+		var serviceTier string
+		switch request := info.Request.(type) {
+		case *dto.GeneralOpenAIRequest:
+			serviceTier = common.JsonRawMessageToString(request.ServiceTier)
+		case *dto.OpenAIResponsesRequest:
+			serviceTier = request.ServiceTier
+		case *dto.OpenAIResponsesCompactionRequest:
+			serviceTier = request.ServiceTier
+		case *dto.ClaudeRequest:
+			serviceTier = request.ServiceTier
+		}
+		if policy.IsBlocked(serviceTier) {
+			service.RequestPolicy(c).AddEvent(service.PolicyEvent{ErrorCode: string(types.ErrorCodeInvalidRequest), ErrorSource: "local", Decision: service.PolicyDecision{Action: "stop", Reason: "local_rejection", Source: "global"}, Health: "unchanged"})
+			message := fmt.Sprintf("service_tier %q is not allowed by the administrator", strings.TrimSpace(serviceTier))
+			logger.LogWarn(c, message)
+			return types.NewErrorWithStatusCode(errors.New(message), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
+	}
+
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	meta := &types.TokenCountMeta{TokenType: types.TokenTypeTokenizer}
 	if info.Request != nil && (needSensitiveCheck || constant.CountToken) {
