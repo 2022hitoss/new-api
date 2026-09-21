@@ -46,3 +46,23 @@ to the same default `type=gha` scope concurrently and evicted each other's
 blobs. `.github/workflows/docker-build.yml` now uses
 `scope=<arch>` on both `cache-from` and `cache-to`, plus `ignore-error=true`
 so a cache export failure cannot fail a build whose image push succeeded.
+
+## Images pushed by digest (2026-09-21)
+
+Two builds had already produced 25 package versions in GHCR, six of them
+single-architecture tags (`main-amd64`, `latest-arm64`, …) that nothing ever
+pulls. `.github/workflows/docker-build.yml` now follows the upstream Docker
+multi-arch pattern:
+
+- Each architecture pushes by digest only (`push-by-digest=true`, no tags) and
+  passes its digest to the manifest job through a build artifact.
+- `create_manifests` builds the index once with every tag attached, so the
+  registry only ever shows the tags that are meant to be pulled.
+- Only the final index is signed. The per-architecture cosign signatures were
+  dropped: they signed intermediate manifests nobody references by name and cost
+  two extra package versions per build.
+
+This removes the single-arch tags, not the underlying versions — the
+per-architecture manifests and the provenance/SBOM attestations stay in the
+registry because the index references them. Bounding total growth is the job of
+the retention policy, not of this change.
