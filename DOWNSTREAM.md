@@ -66,3 +66,19 @@ This removes the single-arch tags, not the underlying versions — the
 per-architecture manifests and the provenance/SBOM attestations stay in the
 registry because the index references them. Bounding total growth is the job of
 the retention policy, not of this change.
+
+## GHCR retention (2026-09-21)
+
+`.github/workflows/ghcr-retention.yml` prunes the container package weekly
+(Sunday 04:41 UTC) and on demand, keeping the 3 most recent
+`main-<YYYYMMDD>-<sha>` indexes plus whatever `main` and `latest` point at.
+
+The plan is built from the registry, not from age: every kept index is inspected
+with `imagetools inspect --raw`, and its child manifests (per-architecture
+images, provenance and SBOM attestations) and cosign signatures are protected
+alongside it. Anything outside that set is deleted. The job aborts without
+deleting if no index matches the rules or if an index cannot be inspected.
+
+- Requires the `GHCR_CLEANUP_PAT` secret with `read:packages` and
+  `delete:packages`; `GITHUB_TOKEN` cannot manage user-owned packages.
+- `workflow_dispatch` defaults to `dry_run: true`; the schedule always applies.
