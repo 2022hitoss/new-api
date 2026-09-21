@@ -1,0 +1,44 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { useQuery } from '@tanstack/react-query'
+
+import { requireServerSuccess } from '@/lib/server-error-message'
+import { dateToUnixTimestamp } from '@/lib/time'
+
+import { getUserUsageStats } from '../api'
+import type { UsageStatsRange } from '../lib/time-range'
+
+export function useUserUsageStats(range: UsageStatsRange) {
+  const startTimestamp = dateToUnixTimestamp(range.start)
+  const endTimestamp = dateToUnixTimestamp(range.end)
+
+  return useQuery({
+    queryKey: ['user-usage-stats', startTimestamp, endTimestamp],
+    queryFn: async () => {
+      const response = requireServerSuccess(
+        await getUserUsageStats({
+          start_timestamp: startTimestamp,
+          end_timestamp: endTimestamp,
+        })
+      )
+      return response.data ?? []
+    },
+    staleTime: 60_000,
+  })
+}
