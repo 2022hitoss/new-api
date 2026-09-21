@@ -25,6 +25,7 @@ import { PaymentSettingsSection } from '../integrations/payment-settings-section
 import { RatioSettingsCard } from '../models/ratio-settings-card'
 import type { BillingSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { QuotaRefillSettingsSection } from './quota-refill-settings-section'
 
 const getModelDefaults = (settings: BillingSettings) => ({
   ModelPrice: settings.ModelPrice,
@@ -197,6 +198,27 @@ const BILLING_SECTIONS = [
           enabled: settings['checkin_setting.enabled'],
           minQuota: settings['checkin_setting.min_quota'],
           maxQuota: settings['checkin_setting.max_quota'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'quota-refill',
+    titleKey: 'Quota Refill',
+    build: (settings: BillingSettings) => (
+      <QuotaRefillSettingsSection
+        defaultValues={{
+          monthlyResetEnabled:
+            settings['quota_refill_setting.monthly_reset_enabled'],
+          monthlyResetGroupQuota:
+            settings['quota_refill_setting.monthly_reset_group_quota'],
+          monthlyResetLastPeriod:
+            settings['quota_refill_setting.monthly_reset_last_period'],
+          selfRefillEnabled:
+            settings['quota_refill_setting.self_refill_enabled'],
+          selfRefillThreshold:
+            settings['quota_refill_setting.self_refill_threshold'],
+          selfRefillTarget: settings['quota_refill_setting.self_refill_target'],
         }}
       />
     ),

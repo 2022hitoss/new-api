@@ -92,3 +92,40 @@ which is exactly the delete condition — a retention run landing in that window
 would delete the image being built. The weekly schedule also moved to 07:23 UTC,
 about four hours after the 03:17 UTC upstream sync check and the build its
 auto-merged PR triggers.
+
+## Monthly quota reset & self refill (2026-09-21)
+
+Internal-use wallet features layered on upstream mechanisms (system task
+framework, `config.GlobalConfig` settings, `AdjustUserQuota`). All quota values
+are stored in internal quota units; the admin UI converts from the site's
+display currency.
+
+- **Monthly reset**: every enabled user in a configured group has `quota` set to
+  the group's configured balance once per calendar month. Implemented as a
+  scheduled system task (`monthly_quota_reset`): `Enabled()` is true only while
+  `monthly_reset_last_period != current YYYY-MM`, so exactly one task row is
+  created per month (retries every 10 minutes after a failed run) and enabling
+  the feature mid-month runs it immediately. Re-enabling within the same month is
+  a no-op; clear `quota_refill_setting.monthly_reset_last_period` via
+  `PUT /api/option/` to force another run. The month boundary follows the
+  server/container time zone — set `TZ` (e.g. `Asia/Shanghai`) in deployment.
+- **Self refill**: `GET/POST /api/user/self/refill`. While `quota < threshold`
+  the user can set their balance to the configured target (idempotent; checked
+  inside the row-locked transaction). Wallet page shows a card when enabled.
+- Option keys (`quota_refill_setting.*`): `monthly_reset_enabled`,
+  `monthly_reset_group_quota` (JSON group → quota), `monthly_reset_last_period`
+  (written by the task), `self_refill_enabled`, `self_refill_threshold`,
+  `self_refill_target`.
+- New files: `setting/operation_setting/quota_refill_setting.go`,
+  `model/quota_refill.go` (+ `_test.go`), `controller/quota_refill.go`,
+  `web/src/features/wallet/hooks/use-self-refill.ts`,
+  `web/src/features/wallet/components/self-refill-card.tsx`,
+  `web/src/features/system-settings/billing/{quota-refill-settings-section,group-quota-visual-editor,group-quota-dialog}.tsx`
+  and their `__tests__/`.
+- Upstream files touched (append-only, keep small on merges):
+  `model/system_task.go` (task type const), `controller/system_task_handlers.go`
+  (handler registration), `model/option.go` (`validateOptionValue` hook),
+  `router/api-router.go` (2 routes), `i18n/keys.go` + `i18n/locales/*.yaml`
+  (1 message key), `web/src/features/system-settings/{types.ts,billing/index.tsx,billing/section-registry.tsx}`,
+  `web/src/features/wallet/index.tsx`, `web/src/features/system-info/constants.ts`,
+  `web/src/i18n/locales/*.json`.

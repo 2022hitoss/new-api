@@ -107,6 +107,12 @@ const defaultBillingSettings: BillingSettings = {
   'checkin_setting.enabled': false,
   'checkin_setting.min_quota': 1000,
   'checkin_setting.max_quota': 10000,
+  'quota_refill_setting.monthly_reset_enabled': false,
+  'quota_refill_setting.monthly_reset_group_quota': '{}',
+  'quota_refill_setting.monthly_reset_last_period': '',
+  'quota_refill_setting.self_refill_enabled': false,
+  'quota_refill_setting.self_refill_threshold': 0,
+  'quota_refill_setting.self_refill_target': 0,
 }
 
 export function BillingSettings() {

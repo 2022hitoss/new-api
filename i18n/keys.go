@@ -110,6 +110,7 @@ const (
 	MsgUserTransferSuccess           = "user.transfer_success"
 	MsgUserTransferFailed            = "user.transfer_failed"
 	MsgUserTopUpProcessing           = "user.topup_processing"
+	MsgSelfRefillNotEligible         = "user.self_refill_not_eligible"
 	MsgUserRegisterFailed            = "user.register_failed"
 	MsgUserDefaultTokenFailed        = "user.default_token_failed"
 	MsgUserAffCodeEmpty              = "user.aff_code_empty"

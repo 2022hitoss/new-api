@@ -30,6 +30,7 @@ import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
 import { RechargeFormCard } from './components/recharge-form-card'
+import { SelfRefillCard } from './components/self-refill-card'
 import { SubscriptionPlansCard } from './components/subscription-plans-card'
 import { WalletStatsCard } from './components/wallet-stats-card'
 import { DEFAULT_DISCOUNT_RATE, PAYMENT_TYPES } from './constants'
@@ -42,6 +43,7 @@ import {
   useWaffoPayment,
   useWaffoPancakePayment,
 } from './hooks'
+import { useSelfRefill } from './hooks/use-self-refill'
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
@@ -128,6 +130,8 @@ export function Wallet(props: WalletProps) {
   useEffect(() => {
     fetchUser()
   }, [fetchUser])
+
+  const selfRefill = useSelfRefill(fetchUser)
 
   useEffect(() => {
     if (props.initialShowHistory) {
@@ -289,6 +293,13 @@ export function Wallet(props: WalletProps) {
         <SectionPageLayout.Content>
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={user} loading={userLoading} />
+
+            <SelfRefillCard
+              info={selfRefill.info}
+              loading={selfRefill.loading}
+              refilling={selfRefill.refilling}
+              onRefill={selfRefill.refill}
+            />
 
             <div
               className={
