@@ -70,7 +70,7 @@ the retention policy, not of this change.
 ## GHCR retention (2026-09-21)
 
 `.github/workflows/ghcr-retention.yml` prunes the container package weekly
-(Sunday 04:41 UTC) and on demand, keeping the 3 most recent
+(Sunday 07:23 UTC) and on demand, keeping the 3 most recent
 `main-<YYYYMMDD>-<sha>` indexes plus whatever `main` and `latest` point at.
 
 The plan is built from the registry, not from age: every kept index is inspected
@@ -82,3 +82,13 @@ deleting if no index matches the rules or if an index cannot be inspected.
 - Requires the `GHCR_CLEANUP_PAT` secret with `read:packages` and
   `delete:packages`; `GITHUB_TOKEN` cannot manage user-owned packages.
 - `workflow_dispatch` defaults to `dry_run: true`; the schedule always applies.
+
+## Retention waits for image builds (2026-09-21)
+
+A `guard` job now skips the retention run whenever `docker-build.yml` has a run
+that is not `completed`. Between pushing the per-architecture digests and
+creating the index, a build's manifests are untagged and referenced by nothing,
+which is exactly the delete condition — a retention run landing in that window
+would delete the image being built. The weekly schedule also moved to 07:23 UTC,
+about four hours after the 03:17 UTC upstream sync check and the build its
+auto-merged PR triggers.

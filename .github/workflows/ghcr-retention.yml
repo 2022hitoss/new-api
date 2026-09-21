@@ -9,9 +9,10 @@ on:
         default: true
         type: boolean
 
-  # 每周日 04:41 UTC
+  # 每周日 07:23 UTC。上游同步在每天 03:17 UTC 检查，其 PR 通过 CI 自动合并后
+  # 会触发一次镜像构建；这里刻意留出约 4 小时，避免清理撞上构建。
   schedule:
-    - cron: '41 4 * * 0'
+    - cron: '23 7 * * 0'
 
 permissions:
   contents: read
@@ -26,8 +27,45 @@ env:
   KEEP_VERSIONS: 3
 
 jobs:
+  # push-by-digest 的构建中途存在一段「各架构 digest 已推送、索引尚未创建」的
+  # 窗口。那些 manifest 此时无标签也无人引用，正好落在删除条件上，清理一旦撞进
+  # 这段窗口就会删掉在建镜像并让构建失败。清理每周才跑一次，跳过一次无代价。
+  guard:
+    name: Check for running image builds
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+
+    steps:
+      - name: Look for in-flight builds
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          active="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow docker-build.yml \
+            --limit 20 \
+            --json status \
+            --jq '[.[] | select(.status != "completed")] | length')"
+
+          if [ "$active" -gt 0 ]; then
+            echo "::notice::${active} image build(s) still running; skipping this retention run"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No image build in flight"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   prune:
     name: Prune old GHCR versions
+    needs: [guard]
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
