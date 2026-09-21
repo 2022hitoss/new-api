@@ -20,18 +20,16 @@ import { getRouteApi } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DataTablePage, useDataTable } from '@/components/data-table'
 import { SectionPageLayout } from '@/components/layout'
 
 import { ExportCsvButton } from './components/export-csv-button'
-import { useUserUsageStatsColumns } from './components/user-usage-stats-columns'
+import { UserUsageStatsTable } from './components/user-usage-stats-table'
 import { UserUsageStatsToolbar } from './components/user-usage-stats-toolbar'
 import { useUserUsageStats } from './hooks/use-user-usage-stats'
+import { useUserUsageStatsTable } from './hooks/use-user-usage-stats-table'
 import { resolveUsageStatsRange } from './lib/time-range'
-import type { UserUsageStat } from './types'
 
 const route = getRouteApi('/_authenticated/user-usage-stats/')
-const EMPTY_ROWS: UserUsageStat[] = []
 
 export function UserUsageStats() {
   const { t } = useTranslation()
@@ -43,17 +41,7 @@ export function UserUsageStats() {
     [startTime, endTime]
   )
   const { data, isLoading, isFetching } = useUserUsageStats(range)
-  const columns = useUserUsageStatsColumns()
-
-  const { table } = useDataTable({
-    data: data ?? EMPTY_ROWS,
-    columns,
-    manualPagination: false,
-    initialSorting: [{ id: 'quota', desc: true }],
-    initialPagination: { pageIndex: 0, pageSize: 50 },
-    getRowId: (row) => String(row.user_id),
-    columnVisibilityStorageKey: 'user-usage-stats-columns',
-  })
+  const { table, columns } = useUserUsageStatsTable(data)
 
   return (
     <SectionPageLayout fixedContent>
@@ -67,21 +55,11 @@ export function UserUsageStats() {
         </div>
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
-        <DataTablePage
+        <UserUsageStatsTable
           table={table}
           columns={columns}
           isLoading={isLoading}
           isFetching={isFetching}
-          emptyTitle={t('No usage in this period')}
-          emptyDescription={t(
-            'No consume logs were recorded for the selected time range.'
-          )}
-          skeletonKeyPrefix='user-usage-stats-skeleton'
-          applyHeaderSize
-          toolbarProps={{
-            searchPlaceholder: t('Filter by username'),
-            searchKey: 'username',
-          }}
         />
       </SectionPageLayout.Content>
     </SectionPageLayout>
