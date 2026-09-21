@@ -21,3 +21,18 @@ Local customizations will be documented here.
   opens do not trigger `ci.yml`.
 - Sync PRs MUST be merged with a merge commit. Squash or rebase drops the upstream
   tag commit from `main`'s history, and the workflow would reopen the PR every day.
+
+## Image builds follow branches, not tags (2026-09-21)
+
+This fork does not maintain its own git tags, so `.github/workflows/docker-build.yml`
+is now driven by branches:
+
+- Triggers on every push to `main`, plus `workflow_dispatch` with no inputs — the
+  branch is chosen in the "Use workflow from" dropdown. The tag-push trigger and the
+  required `tag` input are gone.
+- Tags published per build:
+  - `main` push → `main`, `main-<YYYYMMDD>-<short sha>`, `latest`
+  - other branch → `<branch slug>`, `<branch slug>-<YYYYMMDD>-<short sha>`, no `latest`
+  - tag push (kept working, unused today) → `<tag>`, `latest`
+- A `prepare` job resolves the image name and tag list once, so both architectures
+  agree on the timestamp and the manifest job reuses the same list.
