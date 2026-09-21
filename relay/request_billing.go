@@ -40,7 +40,7 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 		}
 		if policy.IsBlocked(serviceTier) {
 			service.RequestPolicy(c).AddEvent(service.PolicyEvent{ErrorCode: string(types.ErrorCodeInvalidRequest), ErrorSource: "local", Decision: service.PolicyDecision{Action: "stop", Reason: "local_rejection", Source: "global"}, Health: "unchanged"})
-			message := fmt.Sprintf("service_tier %q is not allowed by the administrator", strings.TrimSpace(serviceTier))
+			message := fmt.Sprintf("service_tier %q is not allowed by the administrator. Please check whether FAST MODE is enabled.", strings.TrimSpace(serviceTier))
 			logger.LogWarn(c, message)
 			return types.NewErrorWithStatusCode(errors.New(message), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
