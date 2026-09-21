@@ -323,7 +323,7 @@ func AddToken(c *gin.Context) {
 		token.CrossGroupRetry = false
 		_ = token.SetAutoGroups(nil)
 	}
-	key, err := common.GenerateKey()
+	key, err := operation_setting.GenerateTokenKey()
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTokenGenerateFailed)
 		common.SysLog("failed to generate token key: " + err.Error())

@@ -6814,6 +6814,14 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "API key format": "Формат API-ключей",
+    "Custom key prefix": "Пользовательский префикс ключа",
+    "Controls the shape of API keys that users generate. Keys that already exist are not changed.": "Определяет формат API-ключей, создаваемых пользователями. Существующие ключи не изменяются.",
+    "Inserted between \"sk-\" and the random part of every newly generated key. Letters, digits and underscores only, up to 32 characters. Leave blank to keep the default \"sk-\" format.": "Вставляется между \"sk-\" и случайной частью каждого нового ключа. Только буквы, цифры и подчёркивания, не более 32 символов. Оставьте пустым, чтобы сохранить формат \"sk-\" по умолчанию.",
+    "Preview of new keys": "Предварительный просмотр новых ключей",
+    "e.g. abcd": "например, abcd",
+    "Only letters, digits and underscores are allowed": "Разрешены только буквы, цифры и подчёркивания",
+    "Must be at most {{count}} characters": "Не более {{count}} символов"
   }
 }

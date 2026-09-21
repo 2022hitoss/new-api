@@ -234,6 +234,9 @@ func validateOptionValue(key string, value string) error {
 	if err := operation_setting.ValidateQuotaRefillOption(key, value); err != nil {
 		return err
 	}
+	if err := operation_setting.ValidateTokenKeyOption(key, value); err != nil {
+		return err
+	}
 	if key == operation_setting.ToolPriceOptionKey {
 		return operation_setting.ValidateToolPricesJSON(value)
 	}

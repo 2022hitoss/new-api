@@ -154,6 +154,7 @@ export type SiteSettings = {
   'legal.privacy_policy': string
   HeaderNavModules: string
   SidebarModulesAdmin: string
+  'token_key_setting.custom_prefix': string
 }
 
 export type AuthSettings = {

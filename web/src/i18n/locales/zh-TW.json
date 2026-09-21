@@ -6814,6 +6814,14 @@
     "Zhipu": "智譜",
     "Zhipu GLM": "智譜GLM",
     "Zhipu V4": "智譜 V4",
-    "Zoom": "縮放"
+    "Zoom": "縮放",
+    "API key format": "API 金鑰格式",
+    "Custom key prefix": "自訂金鑰前綴",
+    "Controls the shape of API keys that users generate. Keys that already exist are not changed.": "控制使用者產生的 API 金鑰格式。已存在的金鑰不會被修改。",
+    "Inserted between \"sk-\" and the random part of every newly generated key. Letters, digits and underscores only, up to 32 characters. Leave blank to keep the default \"sk-\" format.": "插入在每個新產生金鑰的 \"sk-\" 與隨機部分之間。僅允許字母、數字和底線，最多 32 個字元。留空則保持預設的 \"sk-\" 格式。",
+    "Preview of new keys": "新金鑰預覽",
+    "e.g. abcd": "例如 abcd",
+    "Only letters, digits and underscores are allowed": "僅允許字母、數字和底線",
+    "Must be at most {{count}} characters": "最多 {{count}} 個字元"
   }
 }

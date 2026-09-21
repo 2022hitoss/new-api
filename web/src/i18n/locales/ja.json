@@ -6814,6 +6814,14 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "API key format": "API キー形式",
+    "Custom key prefix": "カスタムキープレフィックス",
+    "Controls the shape of API keys that users generate. Keys that already exist are not changed.": "ユーザーが生成する API キーの形式を制御します。既存のキーは変更されません。",
+    "Inserted between \"sk-\" and the random part of every newly generated key. Letters, digits and underscores only, up to 32 characters. Leave blank to keep the default \"sk-\" format.": "新しく生成される各キーの \"sk-\" とランダム部分の間に挿入されます。英数字とアンダースコアのみ、最大 32 文字。空欄の場合はデフォルトの \"sk-\" 形式を維持します。",
+    "Preview of new keys": "新しいキーのプレビュー",
+    "e.g. abcd": "例: abcd",
+    "Only letters, digits and underscores are allowed": "英数字とアンダースコアのみ使用できます",
+    "Must be at most {{count}} characters": "{{count}} 文字以内で入力してください"
   }
 }

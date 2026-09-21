@@ -28,6 +28,7 @@ import { NoticeSection } from '../maintenance/notice-section'
 import { SidebarModulesSection } from '../maintenance/sidebar-modules-section'
 import type { SiteSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { TokenKeyPrefixSection } from './token-key-prefix-section'
 
 const SITE_SECTIONS = [
   {
@@ -90,6 +91,15 @@ const SITE_SECTIONS = [
         />
       )
     },
+  },
+  {
+    id: 'api-key-format',
+    titleKey: 'API key format',
+    build: (settings: SiteSettings) => (
+      <TokenKeyPrefixSection
+        defaultValue={settings['token_key_setting.custom_prefix'] ?? ''}
+      />
+    ),
   },
 ] as const
 
