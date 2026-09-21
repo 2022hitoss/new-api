@@ -355,6 +355,12 @@ export type BillingSettings = {
   'checkin_setting.enabled': boolean
   'checkin_setting.min_quota': number
   'checkin_setting.max_quota': number
+  'quota_refill_setting.monthly_reset_enabled': boolean
+  'quota_refill_setting.monthly_reset_group_quota': string
+  'quota_refill_setting.monthly_reset_last_period': string
+  'quota_refill_setting.self_refill_enabled': boolean
+  'quota_refill_setting.self_refill_threshold': number
+  'quota_refill_setting.self_refill_target': number
 }
 
 export type OperationsSettings = {
