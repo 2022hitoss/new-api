@@ -38,6 +38,7 @@ const defaultSiteSettings: SiteSettings = {
   'legal.privacy_policy': '',
   HeaderNavModules: '',
   SidebarModulesAdmin: '',
+  'token_key_setting.custom_prefix': '',
 }
 
 export function SiteSettings() {

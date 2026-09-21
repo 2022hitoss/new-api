@@ -299,8 +299,7 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 		if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
 			key = strings.TrimSpace(key[7:])
 		}
-		key = strings.TrimPrefix(key, "sk-")
-		parts := strings.Split(key, "-")
+		parts := splitTokenChannelHint(key)
 		key = parts[0]
 
 		token, err := model.GetTokenByKey(key, false)
@@ -394,12 +393,10 @@ func TokenAuth() func(c *gin.Context) {
 			if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
 				key = strings.TrimSpace(key[7:])
 			}
-			key = strings.TrimPrefix(key, "sk-")
-			parts = strings.Split(key, "-")
+			parts = splitTokenChannelHint(key)
 			key = parts[0]
 		} else {
-			key = strings.TrimPrefix(key, "sk-")
-			parts = strings.Split(key, "-")
+			parts = splitTokenChannelHint(key)
 			key = parts[0]
 		}
 		token, err := model.ValidateUserToken(key)
@@ -477,6 +474,25 @@ func TokenAuth() func(c *gin.Context) {
 		}
 		c.Next()
 	}
+}
+
+// splitTokenChannelHint separates a bearer credential into the stored token
+// key and the optional channel id an admin may append as "sk-<key>-<id>".
+// The stored key may itself contain a hyphen when a custom prefix is
+// configured ("<prefix>-<random>"), so the hint is only the trailing segment
+// and only when that segment is numeric. The result always has the key at
+// index 0 and the channel id, if any, at index 1.
+func splitTokenChannelHint(raw string) []string {
+	key := strings.TrimPrefix(raw, "sk-")
+	lastSeparator := strings.LastIndex(key, "-")
+	if lastSeparator < 0 {
+		return []string{key}
+	}
+	channelId := key[lastSeparator+1:]
+	if channelId == "" || strings.ContainsFunc(channelId, func(r rune) bool { return r < '0' || r > '9' }) {
+		return []string{key}
+	}
+	return []string{key[:lastSeparator], channelId}
 }
 
 func applyWebSocketSubprotocolAuthorization(header http.Header) bool {

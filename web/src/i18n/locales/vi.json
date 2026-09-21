@@ -6814,6 +6814,14 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "API key format": "Định dạng khóa API",
+    "Custom key prefix": "Tiền tố khóa tùy chỉnh",
+    "Controls the shape of API keys that users generate. Keys that already exist are not changed.": "Kiểm soát định dạng khóa API do người dùng tạo. Các khóa hiện có không bị thay đổi.",
+    "Inserted between \"sk-\" and the random part of every newly generated key. Letters, digits and underscores only, up to 32 characters. Leave blank to keep the default \"sk-\" format.": "Được chèn giữa \"sk-\" và phần ngẫu nhiên của mỗi khóa mới tạo. Chỉ cho phép chữ cái, chữ số và dấu gạch dưới, tối đa 32 ký tự. Để trống để giữ định dạng \"sk-\" mặc định.",
+    "Preview of new keys": "Xem trước khóa mới",
+    "e.g. abcd": "ví dụ: abcd",
+    "Only letters, digits and underscores are allowed": "Chỉ cho phép chữ cái, chữ số và dấu gạch dưới",
+    "Must be at most {{count}} characters": "Tối đa {{count}} ký tự"
   }
 }

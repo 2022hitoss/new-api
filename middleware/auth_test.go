@@ -334,3 +334,24 @@ func TestApplyWebSocketSubprotocolAuthorizationReadsRepeatedHeaders(t *testing.T
 	assert.True(t, applyWebSocketSubprotocolAuthorization(header))
 	assert.Equal(t, "Bearer sk-later-field", header.Get("Authorization"))
 }
+
+func TestSplitTokenChannelHint(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		want []string
+	}{
+		{name: "plain key", raw: "sk-abc123", want: []string{"abc123"}},
+		{name: "key without sk marker", raw: "abc123", want: []string{"abc123"}},
+		{name: "legacy key with channel id", raw: "sk-abc123-42", want: []string{"abc123", "42"}},
+		{name: "prefixed key is kept whole", raw: "sk-team_1-abc123", want: []string{"team_1-abc123"}},
+		{name: "prefixed key with channel id", raw: "sk-team_1-abc123-42", want: []string{"team_1-abc123", "42"}},
+		{name: "numeric prefix is not mistaken for a channel id", raw: "sk-2024-abc123", want: []string{"2024-abc123"}},
+		{name: "non numeric trailing segment is part of the key", raw: "sk-abc123-abc", want: []string{"abc123-abc"}},
+		{name: "empty trailing segment is part of the key", raw: "sk-abc123-", want: []string{"abc123-"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, splitTokenChannelHint(tc.raw))
+		})
+	}
+}

@@ -189,3 +189,38 @@ table as CSV. Sidebar entry "User Usage Statistics" in the Admin group, route
   `web/src/i18n/locales/*.json` (4 new keys). The page reuses
   `CompactDateTimeRangePicker` from `features/usage-logs` via a cross-feature
   import instead of moving it.
+
+## Custom API key prefix (2026-09-21)
+
+Admins can require every newly generated user API key to carry a fixed
+segment: `sk-<prefix>-<48 random chars>` instead of `sk-<48 random chars>`.
+System settings → Site & Branding → new "API key format" page.
+
+- **Storage**: the prefix is part of the stored `tokens.key` value
+  (`<prefix>-<random>`, fits the existing `varchar(128)` column), so the
+  frontend keeps displaying `sk-` + key unchanged, lookups by full key keep
+  working, and keys issued under an older prefix stay valid forever. Changing
+  the prefix only affects keys generated afterwards. Both `POST /api/token/`
+  and the registration default token use `operation_setting.GenerateTokenKey`.
+- **Setting**: `setting/operation_setting/token_key_setting.go`, section
+  `token_key_setting`, key `custom_prefix` (default empty = legacy shape).
+  Validated in `model.validateOptionValue`: letters, digits and underscores
+  only, at most 32 characters. Hyphens are rejected on purpose (see below).
+  Saved through the generic `PUT /api/option/`.
+- **Auth parsing change** (`middleware/auth.go`, `splitTokenChannelHint`):
+  upstream split the credential on the first `-` and used the second segment
+  as the admin-only channel pin (`sk-<key>-<channel id>`). The parser now takes
+  the channel id from the *last* `-` and only when that segment is numeric, so
+  `sk-abc`, `sk-abc-12`, `sk-team_1-abc` and `sk-team_1-abc-12` all resolve
+  correctly. Behaviour change: a non-numeric trailing segment (`sk-abc-xyz`)
+  is now treated as part of the key and yields 401 instead of the previous
+  400 "invalid channel id".
+- Upstream files touched (append-only, keep small on merges):
+  `controller/token.go`, `controller/user.go` (1 line each), `model/option.go`
+  (validation hook), `middleware/auth.go` (3 call sites + 1 helper),
+  `middleware/auth_test.go` (1 test),
+  `web/src/features/system-settings/{types.ts,site/index.tsx,site/section-registry.tsx}`,
+  `web/src/i18n/locales/*.json` (8 keys).
+- New files: `setting/operation_setting/token_key_setting.go` (+ `_test.go`),
+  `web/src/features/system-settings/site/token-key-prefix-section.tsx`
+  (+ `__tests__/`).
