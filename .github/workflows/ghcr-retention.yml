@@ -1,0 +1,168 @@
+name: GHCR retention
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only print what would be deleted'
+        required: false
+        default: true
+        type: boolean
+
+  # 每周日 04:41 UTC
+  schedule:
+    - cron: '41 4 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ghcr-retention
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: new-api
+  # 保留最近多少个带 main-<日期>-<sha> 标签的多架构索引
+  KEEP_VERSIONS: 3
+
+jobs:
+  prune:
+    name: Prune old GHCR versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_CLEANUP_PAT }}
+
+      # 保护集合 = 要保留的索引本身 + 它引用的每个子 manifest（各架构镜像、
+      # provenance 与 SBOM 证明）+ 指向这些 digest 的 cosign 签名。
+      # 只删不在该集合里的版本，这样既不会打断索引，也不会留下孤儿签名。
+      - name: Build retention plan
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_PAT }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          owner="$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${owner}/${PACKAGE_NAME}"
+
+          gh api --paginate \
+            "user/packages/container/${PACKAGE_NAME}/versions?per_page=100" \
+            > all.json
+
+          total="$(jq 'length' all.json)"
+          if [ "$total" -eq 0 ]; then
+            echo "::error::Package ${PACKAGE_NAME} reported no versions"
+            exit 1
+          fi
+
+          # 滚动标签所在的索引永远保留，再按时间保留最近 KEEP_VERSIONS 个带
+          # main-<日期>-<sha> 标签的索引
+          jq -r '
+            [ .[]
+              | select((.metadata.container.tags // [])
+                  | any(. == "main" or . == "latest"))
+            ] | .[].name
+          ' all.json > roots.txt
+
+          jq -r --argjson keep "${KEEP_VERSIONS}" '
+            [ .[]
+              | select((.metadata.container.tags // [])
+                  | any(test("^main-[0-9]{8}-[0-9a-f]{7}$")))
+            ]
+            | sort_by(.created_at) | reverse | .[0:$keep] | .[].name
+          ' all.json >> roots.txt
+
+          sort -u roots.txt -o roots.txt
+          if [ ! -s roots.txt ]; then
+            echo "::error::No index version matched the retention rules; refusing to delete anything"
+            exit 1
+          fi
+
+          # 索引自身 + 它引用的所有子 manifest
+          cp roots.txt protected.txt
+          while IFS= read -r digest; do
+            [ -n "$digest" ] || continue
+            if ! raw="$(docker buildx imagetools inspect --raw "${image}@${digest}")"; then
+              echo "::error::Cannot inspect ${image}@${digest}; refusing to delete anything"
+              exit 1
+            fi
+            printf '%s' "$raw" | jq -r '.manifests[]?.digest' >> protected.txt
+          done < roots.txt
+          sort -u protected.txt -o protected.txt
+
+          # cosign 把签名放在 sha256-<hex> 标签下，保护指向受保护 digest 的那些
+          : > sigs.txt
+          while IFS= read -r digest; do
+            [ -n "$digest" ] || continue
+            jq -r --arg tag "${digest/:/-}" '
+              .[] | select((.metadata.container.tags // []) | any(. == $tag)) | .name
+            ' all.json >> sigs.txt
+          done < protected.txt
+          cat sigs.txt >> protected.txt
+          sort -u protected.txt -o protected.txt
+
+          : > delete.tsv
+          jq -r '.[] | "\(.id)\t\(.name)\t\((.metadata.container.tags // []) | join(","))"' all.json \
+            | while IFS=$'\t' read -r id name tags; do
+                if ! grep -qxF "$name" protected.txt; then
+                  printf '%s\t%s\t%s\n' "$id" "$name" "$tags"
+                fi
+              done > delete.tsv
+
+          kept="$(wc -l < protected.txt)"
+          doomed="$(wc -l < delete.tsv)"
+
+          echo "total=${total} protected=${kept} to_delete=${doomed}"
+          echo "count=${doomed}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### GHCR retention plan"
+            echo ''
+            echo "- package: \`${image}\`"
+            echo "- versions: ${total}"
+            echo "- protected: ${kept}"
+            echo "- to delete: ${doomed}"
+            echo ''
+            echo '<details><summary>Roots kept</summary>'
+            echo ''
+            echo '```'
+            cat roots.txt
+            echo '```'
+            echo '</details>'
+            echo ''
+            echo '<details><summary>Versions to delete</summary>'
+            echo ''
+            echo '```'
+            cut -f2,3 delete.tsv
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete old versions
+        if: ${{ inputs.dry_run != true && steps.plan.outputs.count != '0' }}
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_PAT }}
+        run: |
+          set -euo pipefail
+
+          while IFS=$'\t' read -r id name tags; do
+            [ -n "$id" ] || continue
+            echo "deleting ${name} (${tags:-<untagged>})"
+            gh api -X DELETE \
+              "user/packages/container/${PACKAGE_NAME}/versions/${id}"
+          done < delete.tsv
+
+      - name: Dry run notice
+        if: ${{ inputs.dry_run == true }}
+        run: echo "::notice::Dry run — nothing was deleted. Re-run with dry_run disabled to apply."
