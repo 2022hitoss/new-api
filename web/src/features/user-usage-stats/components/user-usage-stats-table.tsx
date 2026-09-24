@@ -46,7 +46,7 @@ export function UserUsageStatsTable(props: UserUsageStatsTableProps) {
       skeletonKeyPrefix='user-usage-stats-skeleton'
       applyHeaderSize
       toolbarProps={{
-        searchPlaceholder: t('Filter by username'),
+        searchPlaceholder: t('Filter by username or display name'),
         searchKey: 'username',
       }}
     />

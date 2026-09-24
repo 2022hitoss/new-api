@@ -2568,6 +2568,7 @@
     "Filter by task ID": "Фильтр по ID задачи",
     "Filter by token name": "Фильтр по имени токена",
     "Filter by username": "Фильтр по имени пользователя",
+    "Filter by username or display name": "Фильтр по имени пользователя или отображаемому имени",
     "Filter by username, name or email...": "Фильтр по имени пользователя, имени или email...",
     "Filter Dashboard Models": "Фильтровать модели панели управления",
     "Filter mappings": "Фильтр сопоставлений",

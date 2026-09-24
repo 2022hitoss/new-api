@@ -28,6 +28,7 @@ const ROWS: UserUsageStat[] = [
   {
     user_id: 1,
     username: 'alice',
+    display_name: 'Alice Liddell',
     request_count: 2,
     prompt_tokens: 30,
     completion_tokens: 10,
@@ -37,6 +38,7 @@ const ROWS: UserUsageStat[] = [
   {
     user_id: 2,
     username: 'bob',
+    display_name: '',
     request_count: 1,
     prompt_tokens: 7,
     completion_tokens: 3,
@@ -65,7 +67,9 @@ describe('user usage stats table', () => {
   test('renders the toolbar and every user row without a filter state', () => {
     render(<Harness rows={ROWS} />)
 
-    expect(screen.getByPlaceholderText('Filter by username')).toBeVisible()
+    expect(
+      screen.getByPlaceholderText('Filter by username or display name')
+    ).toBeVisible()
     expect(screen.getByText('alice')).toBeVisible()
     expect(screen.getByText('bob')).toBeVisible()
   })
@@ -74,12 +78,32 @@ describe('user usage stats table', () => {
     const user = userEvent.setup()
     render(<Harness rows={ROWS} />)
 
-    await user.type(screen.getByPlaceholderText('Filter by username'), 'bob')
+    await user.type(
+      screen.getByPlaceholderText('Filter by username or display name'),
+      'bob'
+    )
 
     await waitFor(() => {
       expect(screen.queryByText('alice')).not.toBeInTheDocument()
     })
     expect(screen.getByText('bob')).toBeVisible()
+  })
+
+  test('shows display names and matches them in the search', async () => {
+    const user = userEvent.setup()
+    render(<Harness rows={ROWS} />)
+
+    expect(screen.getByText('Alice Liddell')).toBeVisible()
+
+    await user.type(
+      screen.getByPlaceholderText('Filter by username or display name'),
+      'liddell'
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText('bob')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('alice')).toBeVisible()
   })
 
   test('shows the empty state when there are no rows', () => {

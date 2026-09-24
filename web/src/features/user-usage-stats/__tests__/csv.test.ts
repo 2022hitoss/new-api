@@ -23,6 +23,7 @@ import type { UserUsageStat } from '../types'
 
 const HEADERS = [
   'Username',
+  'Display Name',
   'User ID',
   'Request Count',
   'Prompt Tokens',
@@ -36,6 +37,7 @@ function row(overrides: Partial<UserUsageStat> = {}): UserUsageStat {
   return {
     user_id: 1,
     username: 'alice',
+    display_name: 'Alice',
     request_count: 3,
     prompt_tokens: 1200,
     completion_tokens: 300,
@@ -63,18 +65,18 @@ describe('buildUserUsageStatsCsv', () => {
     const csv = buildUserUsageStatsCsv([row()], options)
 
     expect(csv.slice(1).split('\r\n')[1]).toBe(
-      'alice,1,3,1200,300,1500,5000,0.0100'
+      'alice,Alice,1,3,1200,300,1500,5000,0.0100'
     )
   })
 
-  test('quotes usernames containing commas, quotes or line breaks', () => {
+  test('quotes names containing commas, quotes or line breaks', () => {
     const csv = buildUserUsageStatsCsv(
-      [row({ username: 'a,b "c"\nd' })],
+      [row({ username: 'a,b "c"\nd', display_name: 'Doe, "J"' })],
       options
     )
 
     expect(csv.slice(1).split('\r\n')[1]).toBe(
-      '"a,b ""c""\nd",1,3,1200,300,1500,5000,0.0100'
+      '"a,b ""c""\nd","Doe, ""J""",1,3,1200,300,1500,5000,0.0100'
     )
   })
 
@@ -94,8 +96,8 @@ describe('buildUserUsageStatsCsv', () => {
     )
     const lines = csv.slice(1).split('\r\n')
 
-    expect(lines[1].startsWith('zed,9,')).toBe(true)
-    expect(lines[2].startsWith('amy,2,')).toBe(true)
+    expect(lines[1].startsWith('zed,Alice,9,')).toBe(true)
+    expect(lines[2].startsWith('amy,Alice,2,')).toBe(true)
   })
 })
 

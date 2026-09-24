@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { UserUsageStat } from '../types'
 
 export type UserUsageStatsCsvOptions = {
-  /** Translated column headers, in output column order (8 entries). */
+  /** Translated column headers, in output column order (9 entries). */
   headers: string[]
   /** Renders the raw quota as the site's display currency. */
   formatQuotaDisplay: (quota: number) => string
@@ -47,6 +47,7 @@ export function buildUserUsageStatsCsv(
     lines.push(
       [
         row.username,
+        row.display_name,
         row.user_id,
         row.request_count,
         row.prompt_tokens,

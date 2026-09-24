@@ -29,7 +29,10 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import type { UserUsageStat } from '../types'
 
-type NumericKey = Exclude<keyof UserUsageStat, 'username' | 'user_id'>
+type NumericKey = Exclude<
+  keyof UserUsageStat,
+  'username' | 'display_name' | 'user_id'
+>
 
 export function useUserUsageStatsColumns(): ColumnDef<UserUsageStat>[] {
   const { t, i18n } = useTranslation()
@@ -64,7 +67,24 @@ export function useUserUsageStatsColumns(): ColumnDef<UserUsageStat>[] {
         cell: ({ row }) => (
           <span className='text-sm font-medium'>{row.original.username}</span>
         ),
+        // The username search box also matches display names.
+        filterFn: (row, _id, value: string) => {
+          const query = value.toLowerCase()
+          return [row.original.username, row.original.display_name].some(
+            (name) => name.toLowerCase().includes(query)
+          )
+        },
         meta: { label: t('Username'), mobileTitle: true },
+      },
+      {
+        accessorKey: 'display_name',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('Display Name')} />
+        ),
+        cell: ({ row }) => (
+          <span className='text-sm'>{row.original.display_name || '-'}</span>
+        ),
+        meta: { label: t('Display Name'), mobileOrder: 5 },
       },
       {
         accessorKey: 'user_id',

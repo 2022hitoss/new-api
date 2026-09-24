@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 export interface UserUsageStat {
   user_id: number
   username: string
+  display_name: string
   request_count: number
   prompt_tokens: number
   completion_tokens: number
