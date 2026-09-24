@@ -245,6 +245,8 @@ performance.gc_executed: "GC 已執行"
 # Ability messages
 ability.db_corrupted: "資料庫一致性被破壞"
 ability.repair_running: "已經有一個修復任務在運行中，請稍後再試"
+pricing_sync.no_sources: "尚未設定價格同步來源"
+pricing_sync.task_running: "已有價格同步任務正在執行或等待中"
 
 # OAuth messages
 oauth.invalid_code: "無效的授權碼"

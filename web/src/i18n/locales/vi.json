@@ -6822,6 +6822,24 @@
     "Preview of new keys": "Xem trước khóa mới",
     "e.g. abcd": "ví dụ: abcd",
     "Only letters, digits and underscores are allowed": "Chỉ cho phép chữ cái, chữ số và dấu gạch dưới",
-    "Must be at most {{count}} characters": "Tối đa {{count}} ký tự"
+    "Must be at most {{count}} characters": "Tối đa {{count}} ký tự",
+    "Automatic Price Sync": "Tự động đồng bộ giá",
+    "Automatic price sync": "Tự động đồng bộ giá",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "Mỗi lần chạy sẽ lấy giá từ các nguồn bên dưới và ghi đè giá cục bộ của mọi mô hình do kênh đang bật cung cấp, kể cả giá đặt thủ công. Các mô hình chỉ có ở nguồn sẽ không được nhập.",
+    "Enable automatic price sync": "Bật tự động đồng bộ giá",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "Đồng bộ giá từ nguồn theo lịch để mô hình mới được định giá tự động.",
+    "Sync interval (minutes)": "Chu kỳ đồng bộ (phút)",
+    "Interval must be between {{min}} and {{max}} minutes": "Chu kỳ phải nằm trong khoảng {{min}} đến {{max}} phút",
+    "Sync sources": "Nguồn đồng bộ",
+    "For each model, the first source in this list that has a price wins.": "Với mỗi mô hình, nguồn đầu tiên trong danh sách có giá sẽ được dùng.",
+    "Select sources": "Chọn nguồn",
+    "Sync now": "Đồng bộ ngay",
+    "Save changes before syncing": "Hãy lưu thay đổi trước khi đồng bộ",
+    "No sync sources": "Chưa có nguồn đồng bộ",
+    "Select at least one channel or pricing preset to sync from.": "Chọn ít nhất một kênh hoặc bộ giá có sẵn làm nguồn đồng bộ.",
+    "Default endpoint": "Endpoint mặc định",
+    "Unknown channel": "Kênh không xác định",
+    "Price sync started. Check System Tasks for the result.": "Đã bắt đầu đồng bộ giá. Xem kết quả trong Tác vụ hệ thống.",
+    "Failed to start price sync": "Không thể bắt đầu đồng bộ giá"
   }
 }

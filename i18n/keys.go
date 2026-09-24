@@ -344,3 +344,9 @@ const (
 	MsgCustomOAuthBindingNotFound   = "custom_oauth.binding_not_found"
 	MsgCustomOAuthProviderIdInvalid = "custom_oauth.provider_id_field_invalid"
 )
+
+// Automatic pricing sync related messages
+const (
+	MsgPricingSyncNoSources   = "pricing_sync.no_sources"
+	MsgPricingSyncTaskRunning = "pricing_sync.task_running"
+)

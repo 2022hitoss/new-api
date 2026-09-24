@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -139,4 +141,90 @@ func TestPricingSyncCompleteSourcesAndArrayFormats(t *testing.T) {
 	assert.Equal(t, float64(4), response.Data.Prices["sync-token"].Upstreams["Expressions(1)"]["completion_ratio"])
 	assert.Equal(t, float64(0), response.Data.Prices["sync-token"].Upstreams["Expressions(1)"]["cache_ratio"])
 	assert.Equal(t, float64(0), response.Data.Prices["sync-free"].Upstreams["Legacy(2)"]["model_ratio"])
+}
+
+func TestPlanPricingAutoSync(t *testing.T) {
+	before := config.GlobalConfig.ExportAllConfigs()
+	t.Cleanup(func() {
+		config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_setting"), map[string]string{"plugin_billing_expr": before["billing_setting.plugin_billing_expr"]})
+	})
+	pluginExpr := `tier("base", p * 1)`
+	config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_setting"), map[string]string{"plugin_billing_expr": `{"legacy-plugin::plugin-model":"tier(\"base\", p * 1)"}`})
+	expression := `tier("base", p * 2 + c * 8)`
+
+	local := map[string]any{
+		"model_ratio":      map[string]float64{"priced": 1, "same": 2, "plugin-model": 1},
+		"completion_ratio": map[string]float64{"same": 3},
+	}
+	results := []upstreamResult{
+		{Name: "down(3)", Err: "502 Bad Gateway"},
+		{Name: "first(1)", Data: map[string]any{
+			"model_ratio":      map[string]float64{"priced": 5, "same": 2, "untrusted": 37.5, "upstream-only": 1},
+			"completion_ratio": map[string]float64{"priced": 2, "same": 3, "untrusted": 1},
+			"billing_mode":     map[string]string{"expr": "tiered_expr", "bad-expr": "tiered_expr"},
+			"billing_expr":     map[string]string{"expr": expression, "bad-expr": "tier("},
+		}},
+		{Name: "second(2)", Data: map[string]any{
+			"model_price":      map[string]float64{"new-model": 0.05},
+			"model_ratio":      map[string]float64{"priced": 9, "untrusted": 4, "plugin-model": 3},
+			"completion_ratio": map[string]float64{"untrusted": 2},
+		}},
+	}
+	snapshot := &model.ModelPricingSnapshot{EmptyVersion: "empty", Entries: []model.ModelPricingEntry{
+		{ModelName: "priced", Version: "v-priced", Configured: model.PricingValues{"ModelRatio": float64(1)}},
+		{ModelName: "plugin-model", Version: "v-plugin", Configured: model.PricingValues{
+			"ModelRatio": float64(1), billing_setting.PluginBillingExprOption: map[string]any{"legacy-plugin": pluginExpr},
+		}},
+	}}
+	models := []string{"new-model", "priced", "same", "untrusted", "expr", "bad-expr", "plugin-model", "no-source", "priced"}
+
+	changes, summary := planPricingAutoSync(snapshot, local, results, models)
+
+	got := make(map[string]model.ModelPricingChange, len(changes))
+	for _, change := range changes {
+		got[change.ModelName] = change
+	}
+	assert.Equal(t, map[string]model.ModelPricingChange{
+		"new-model": {ModelName: "new-model", ExpectedVersion: "empty", Pricing: model.PricingValues{
+			"billing_setting.billing_mode": "ratio", "ModelPrice": 0.05}},
+		"priced": {ModelName: "priced", ExpectedVersion: "v-priced", Pricing: model.PricingValues{
+			"billing_setting.billing_mode": "ratio", "ModelRatio": float64(5), "CompletionRatio": float64(2)}},
+		"untrusted": {ModelName: "untrusted", ExpectedVersion: "empty", Pricing: model.PricingValues{
+			"billing_setting.billing_mode": "ratio", "ModelRatio": float64(4), "CompletionRatio": float64(2)}},
+		"expr": {ModelName: "expr", ExpectedVersion: "empty", Pricing: model.PricingValues{
+			"billing_setting.billing_mode": "tiered_expr", "billing_setting.billing_expr": expression}},
+		"plugin-model": {ModelName: "plugin-model", ExpectedVersion: "v-plugin", Pricing: model.PricingValues{
+			"billing_setting.billing_mode": "ratio", "ModelRatio": float64(3),
+			billing_setting.PluginBillingExprOption: map[string]any{"legacy-plugin": pluginExpr}}},
+	}, got, "same price is skipped, first trusted source wins, upstream-only models are ignored")
+	assert.Equal(t, map[string]string{"new-model": "second(2)", "priced": "first(1)", "untrusted": "second(2)", "expr": "first(1)", "plugin-model": "second(2)"}, summary.Updated)
+	assert.Contains(t, summary.Invalid, "bad-expr")
+	assert.Equal(t, []string{"no-source"}, summary.Unpriced)
+	assert.Equal(t, []dto.TestResult{
+		{Name: "down(3)", Status: "error", Error: "502 Bad Gateway"},
+		{Name: "first(1)", Status: "success"},
+		{Name: "second(2)", Status: "success"},
+	}, summary.Sources)
+}
+
+func TestValidatePricingAutoSyncOption(t *testing.T) {
+	cases := []struct {
+		key, value string
+		valid      bool
+	}{
+		{operation_setting.PricingAutoSyncIntervalOptionKey, "10", true},
+		{operation_setting.PricingAutoSyncIntervalOptionKey, "9", false},
+		{operation_setting.PricingAutoSyncIntervalOptionKey, "10081", false},
+		{operation_setting.PricingAutoSyncIntervalOptionKey, "abc", false},
+		{operation_setting.PricingAutoSyncSourcesOptionKey, `[]`, true},
+		{operation_setting.PricingAutoSyncSourcesOptionKey, `[{"id":-100,"endpoint":""},{"id":3,"endpoint":"openrouter"},{"id":4,"endpoint":"/api/ratio_config"},{"id":5,"endpoint":"https://example.com/p.json"}]`, true},
+		{operation_setting.PricingAutoSyncSourcesOptionKey, `[{"id":3},{"id":3}]`, false},
+		{operation_setting.PricingAutoSyncSourcesOptionKey, `[{"id":0}]`, false},
+		{operation_setting.PricingAutoSyncSourcesOptionKey, `[{"id":3,"endpoint":"ftp://x"}]`, false},
+		{operation_setting.PricingAutoSyncSourcesOptionKey, `{"id":3}`, false},
+	}
+	for _, tt := range cases {
+		err := operation_setting.ValidatePricingAutoSyncOption(tt.key, tt.value)
+		assert.Equal(t, tt.valid, err == nil, "%s=%s: %v", tt.key, tt.value, err)
+	}
 }

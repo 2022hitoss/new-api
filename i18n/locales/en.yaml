@@ -244,6 +244,8 @@ performance.gc_executed: "GC has been executed"
 # Ability messages
 ability.db_corrupted: "Database consistency has been compromised"
 ability.repair_running: "A repair task is already running, please try again later"
+pricing_sync.no_sources: "No price sync sources are configured"
+pricing_sync.task_running: "A price sync task is already running or waiting"
 
 # OAuth messages
 oauth.invalid_code: "Invalid authorization code"

@@ -6822,6 +6822,24 @@
     "Preview of new keys": "Preview of new keys",
     "e.g. abcd": "e.g. abcd",
     "Only letters, digits and underscores are allowed": "Only letters, digits and underscores are allowed",
-    "Must be at most {{count}} characters": "Must be at most {{count}} characters"
+    "Must be at most {{count}} characters": "Must be at most {{count}} characters",
+    "Automatic Price Sync": "Automatic Price Sync",
+    "Automatic price sync": "Automatic price sync",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.",
+    "Enable automatic price sync": "Enable automatic price sync",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "Sync prices from upstream on a schedule so new models are priced automatically.",
+    "Sync interval (minutes)": "Sync interval (minutes)",
+    "Interval must be between {{min}} and {{max}} minutes": "Interval must be between {{min}} and {{max}} minutes",
+    "Sync sources": "Sync sources",
+    "For each model, the first source in this list that has a price wins.": "For each model, the first source in this list that has a price wins.",
+    "Select sources": "Select sources",
+    "Sync now": "Sync now",
+    "Save changes before syncing": "Save changes before syncing",
+    "No sync sources": "No sync sources",
+    "Select at least one channel or pricing preset to sync from.": "Select at least one channel or pricing preset to sync from.",
+    "Default endpoint": "Default endpoint",
+    "Unknown channel": "Unknown channel",
+    "Price sync started. Check System Tasks for the result.": "Price sync started. Check System Tasks for the result.",
+    "Failed to start price sync": "Failed to start price sync"
   }
 }

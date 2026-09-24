@@ -224,3 +224,54 @@ System settings → Site & Branding → new "API key format" page.
 - New files: `setting/operation_setting/token_key_setting.go` (+ `_test.go`),
   `web/src/features/system-settings/site/token-key-prefix-section.tsx`
   (+ `__tests__/`).
+
+## Automatic upstream price sync (2026-09-24)
+
+The upstream price sync (Model Pricing → Upstream sync) could only be run by
+hand, so models newly served by a channel stayed unpriced until an admin
+synced. A scheduled system task (`pricing_auto_sync`) now runs the same fetch
+and applies the result.
+
+- **Scope**: only models served by enabled channels (`abilities`, via
+  `model.GetEnabledModels`). Models that exist only upstream are never imported.
+- **Overwrite**: the chosen upstream price replaces the model's local price,
+  including manually set prices, the same way a manual sync replaces it (fields the
+  upstream does not provide, e.g. a local cache ratio, are dropped). Plugin
+  billing expressions (`billing_setting.plugin_billing_expr`) are kept.
+- **Sources** are ordered by priority. For each model, the first source with a
+  price wins. The `37.5 / 1` placeholder that unpriced self-use deployments
+  expose is skipped, as in the manual diff. Channel sources use their base URL
+  and the same endpoint options as the manual dialog. The official preset
+  (`-100`) and models.dev preset (`-101`) are supported.
+- **Safety**: every change goes through `model.ValidateModelPricing` (invalid
+  upstream entries are skipped and listed in the task result) and then
+  `model.UpdateModelPricing` with the snapshot version, so a concurrent admin
+  edit makes the run fail with a conflict instead of being overwritten. The next
+  interval retries. A run where every source fails is marked failed.
+- **Result**: each run is one system task row (System info → System tasks). It
+  holds per-source status, `updated` (model → source), `invalid`, and
+  `unpriced`.
+- **Option keys** (`pricing_auto_sync_setting.*`): `enabled` (default
+  `false`), `interval_minutes` (default 360, 10–10080), and `sources` (JSON array
+  `[{id, endpoint}]`, max 20, unique ids). Values are validated in
+  `model.validateOptionValue`.
+- **API**: `POST /api/ratio_sync/auto/run` (root) enqueues an immediate run with
+  the saved sources, even while the schedule is off. It returns 409 if a run is
+  already active.
+- **UI**: System settings → Billing → "Automatic Price Sync". It has a switch,
+  the interval, an ordered source list (reuses `ChannelSelectorDialog` and
+  `AutoGroupOrderItem`), and "Sync now".
+- New files: `setting/operation_setting/pricing_auto_sync_setting.go`,
+  `controller/pricing_auto_sync.go`,
+  `web/src/features/system-settings/billing/pricing-auto-sync-settings-section.tsx`
+  and `billing/__tests__/pricing-auto-sync-settings.test.tsx`.
+- Upstream files touched: `controller/ratio_sync.go` (the per-upstream fetch
+  loop moved into `fetchUpstreamPricing`, which returns results in source order.
+  `FetchUpstreamRatios` behaves as before), `controller/ratio_sync_test.go`,
+  `controller/system_task_handlers.go`, `model/system_task.go`, `model/option.go`,
+  and `router/api-router.go` (1 route each). Also `i18n/keys.go` +
+  `i18n/locales/*.yaml` (2 keys), and
+  `web/src/features/system-settings/{api.ts,types.ts,billing/index.tsx,billing/section-registry.tsx}`.
+  `models/upstream-ratio-sync{,-helpers}.ts(x)` changed because
+  `getDefaultEndpointForChannel` moved into the helpers. Plus
+  `web/src/features/system-info/constants.ts` and `web/src/i18n/locales/*.json`.

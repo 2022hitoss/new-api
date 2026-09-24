@@ -6822,6 +6822,24 @@
     "Preview of new keys": "新金鑰預覽",
     "e.g. abcd": "例如 abcd",
     "Only letters, digits and underscores are allowed": "僅允許字母、數字和底線",
-    "Must be at most {{count}} characters": "最多 {{count}} 個字元"
+    "Must be at most {{count}} characters": "最多 {{count}} 個字元",
+    "Automatic Price Sync": "自動價格同步",
+    "Automatic price sync": "自動價格同步",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "每次執行都會從下方來源取得價格，並覆寫所有已啟用渠道所提供模型的本地價格，包括手動設定的價格。僅存在於上游的模型不會被匯入。",
+    "Enable automatic price sync": "啟用自動價格同步",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "依排程從上游同步價格，讓新模型自動取得定價。",
+    "Sync interval (minutes)": "同步間隔（分鐘）",
+    "Interval must be between {{min}} and {{max}} minutes": "間隔必須介於 {{min}} 到 {{max}} 分鐘之間",
+    "Sync sources": "同步來源",
+    "For each model, the first source in this list that has a price wins.": "對每個模型，使用列表中第一個提供價格的來源。",
+    "Select sources": "選擇來源",
+    "Sync now": "立即同步",
+    "Save changes before syncing": "請先儲存變更再同步",
+    "No sync sources": "尚無同步來源",
+    "Select at least one channel or pricing preset to sync from.": "請至少選擇一個渠道或價格預設作為同步來源。",
+    "Default endpoint": "預設端點",
+    "Unknown channel": "未知渠道",
+    "Price sync started. Check System Tasks for the result.": "價格同步已開始，請在系統任務中查看結果。",
+    "Failed to start price sync": "啟動價格同步失敗"
   }
 }
