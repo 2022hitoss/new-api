@@ -43,6 +43,7 @@ export function ExportCsvButton(props: ExportCsvButtonProps) {
       {
         headers: [
           t('Username'),
+          t('Display Name'),
           t('User ID'),
           t('Request Count'),
           t('Input Tokens'),

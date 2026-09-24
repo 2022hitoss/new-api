@@ -2568,6 +2568,7 @@
     "Filter by task ID": "タスクIDでフィルター",
     "Filter by token name": "トークン名でフィルター",
     "Filter by username": "ユーザー名でフィルター",
+    "Filter by username or display name": "ユーザー名または表示名でフィルター",
     "Filter by username, name or email...": "ユーザー名、名前またはメールアドレスでフィルター...",
     "Filter Dashboard Models": "ダッシュボードモデルをフィルタリング",
     "Filter mappings": "マッピングを絞り込む",

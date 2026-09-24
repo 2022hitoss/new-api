@@ -166,17 +166,24 @@ table as CSV. Sidebar entry "User Usage Statistics" in the Admin group, route
 `/user-usage-stats?startTime=<ms>&endTime=<ms>`.
 
 - **Data source**: the `logs` table on the log database (`LOG_DB`), rows with
-  `type = consume` only, grouped by `user_id` with `MAX(username)` so a renamed
-  user still yields one row. Sums `quota`, `prompt_tokens`, `completion_tokens`
+  `type = consume` only, grouped by `user_id` so a renamed user still yields
+  one row. Sums `quota`, `prompt_tokens`, `completion_tokens`
   and counts requests. It does not depend on the data dashboard
   (`DataExportEnabled` / `quota_data`) and works with ClickHouse log databases
   because every non-aggregated column is in `GROUP BY`.
+- **Names** (2026-09-24): after aggregation the current `username` and
+  `display_name` are loaded from the main-database `users` table by id (chunks
+  of 500, `Unscoped` so soft-deleted users still resolve; no cross-database
+  JOIN). Users missing from `users` keep the log's `MAX(username)` and an
+  empty display name. The table shows a "Display Name" column, the search box
+  matches username or display name, and the CSV has a Display Name column
+  after Username.
 - **Endpoint**: `GET /api/data/users/usage?start_timestamp=<s>&end_timestamp=<s>`
   (admin only). Bounds are inclusive unix seconds; `0` leaves that side open;
-  `end < start` is rejected. Returns `[{user_id, username, request_count,
+  `end < start` is rejected. Returns `[{user_id, username, display_name, request_count,
   prompt_tokens, completion_tokens, total_tokens, quota}]` sorted by `user_id`.
 - **CSV** is built in the browser from the currently displayed rows (after
-  sorting and username filtering, all pages): UTF-8 BOM, CRLF, RFC 4180 quoting,
+  sorting and username/display-name filtering, all pages): UTF-8 BOM, CRLF, RFC 4180 quoting,
   raw numbers plus a currency-formatted cost column.
 - New files: `model/user_usage_stats.go` (+ `_test.go`),
   `controller/user_usage_stats.go`,
@@ -186,7 +193,7 @@ table as CSV. Sidebar entry "User Usage Statistics" in the Admin group, route
 - Upstream files touched (append-only, keep small on merges):
   `router/api-router.go` (1 route), `web/src/hooks/use-sidebar-data.ts`
   (1 icon import + 1 menu item), `web/src/routeTree.gen.ts` (generated),
-  `web/src/i18n/locales/*.json` (4 new keys). The page reuses
+  `web/src/i18n/locales/*.json` (5 new keys). The page reuses
   `CompactDateTimeRangePicker` from `features/usage-logs` via a cross-feature
   import instead of moving it.
 
