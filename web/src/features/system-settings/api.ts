@@ -125,3 +125,12 @@ export async function fetchUpstreamRatios(request: FetchUpstreamRatiosRequest) {
   )
   return res.data
 }
+
+export async function triggerPricingAutoSync() {
+  const res = await api.post<{
+    success: boolean
+    message?: string
+    data?: { task_id: string; status: string }
+  }>('/api/ratio_sync/auto/run')
+  return res.data
+}

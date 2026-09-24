@@ -43,7 +43,6 @@ import type {
   DifferencesMap,
   PricingSyncModels,
   PricingSyncValues,
-  UpstreamChannel,
   UpstreamConfig,
 } from '../types'
 import { ChannelSelectorDialog } from './channel-selector-dialog'
@@ -52,28 +51,13 @@ import {
   type ConflictItem,
 } from './conflict-confirm-dialog'
 import {
-  DEFAULT_ENDPOINT,
-  MODELS_DEV_PRESET_ENDPOINT,
-  MODELS_DEV_PRESET_ID,
-  OFFICIAL_CHANNEL_ENDPOINT,
-  OFFICIAL_CHANNEL_ID,
-  OPENROUTER_CHANNEL_TYPE,
-  OPENROUTER_ENDPOINT,
-} from './constants'
-import {
   describeSyncPrice,
+  getDefaultEndpointForChannel,
   getUpstreamDisplayName,
   type PricingSourceSelection,
   type PricingSourceSelections,
 } from './upstream-ratio-sync-helpers'
 import { UpstreamRatioSyncTable } from './upstream-ratio-sync-table'
-
-function getDefaultEndpointForChannel(channel: UpstreamChannel): string {
-  if (channel.id === MODELS_DEV_PRESET_ID) return MODELS_DEV_PRESET_ENDPOINT
-  if (channel.id === OFFICIAL_CHANNEL_ID) return OFFICIAL_CHANNEL_ENDPOINT
-  if (channel.type === OPENROUTER_CHANNEL_TYPE) return OPENROUTER_ENDPOINT
-  return DEFAULT_ENDPOINT
-}
 
 export function UpstreamRatioSync() {
   const { t } = useTranslation()

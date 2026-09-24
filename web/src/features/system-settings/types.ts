@@ -362,6 +362,10 @@ export type BillingSettings = {
   'quota_refill_setting.self_refill_enabled': boolean
   'quota_refill_setting.self_refill_threshold': number
   'quota_refill_setting.self_refill_target': number
+  'pricing_auto_sync_setting.enabled': boolean
+  'pricing_auto_sync_setting.interval_minutes': number
+  // JSON array of { id, endpoint }, ordered by priority
+  'pricing_auto_sync_setting.sources': string
 }
 
 export type OperationsSettings = {

@@ -260,8 +260,75 @@ func FetchUpstreamRatios(c *gin.Context) {
 		return
 	}
 
+	results := fetchUpstreamPricing(c.Request.Context(), upstreams, req.Timeout)
+
+	localData := effectivePricingSyncData(getLocalPricingSyncData())
+
+	var testResults []dto.TestResult
+	var successfulChannels []struct {
+		name string
+		data map[string]any
+	}
+
+	for _, r := range results {
+		if r.Err != "" {
+			testResults = append(testResults, dto.TestResult{
+				Name:   r.Name,
+				Status: "error",
+				Error:  r.Err,
+			})
+		} else {
+			testResults = append(testResults, dto.TestResult{
+				Name:   r.Name,
+				Status: "success",
+			})
+			successfulChannels = append(successfulChannels, struct {
+				name string
+				data map[string]any
+			}{name: r.Name, data: effectivePricingSyncData(r.Data)})
+		}
+	}
+
+	differences := buildDifferences(localData, successfulChannels)
+	type modelSyncPrices struct {
+		Current   map[string]any            `json:"current"`
+		Upstreams map[string]map[string]any `json:"upstreams"`
+	}
+	prices := make(map[string]modelSyncPrices, len(differences))
+	for name, fields := range differences {
+		row := modelSyncPrices{Current: modelPricingSyncValues(localData, name), Upstreams: make(map[string]map[string]any)}
+		_, expressionPriority := fields[billing_setting.BillingExprField]
+		for _, channel := range successfulChannels {
+			candidate := modelPricingSyncValues(channel.data, name)
+			if expressionPriority && candidate[billing_setting.BillingModeField] != billing_setting.BillingModeTieredExpr {
+				continue
+			}
+			_, hasRatio := candidate["model_ratio"]
+			_, hasPrice := candidate["model_price"]
+			_, hasExpression := candidate[billing_setting.BillingExprField]
+			if hasRatio || hasPrice || hasExpression {
+				row.Upstreams[channel.name] = candidate
+			}
+		}
+		prices[name] = row
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"differences":  differences,
+			"prices":       prices,
+			"test_results": testResults,
+		},
+	})
+}
+
+// fetchUpstreamPricing downloads and normalizes pricing data from every
+// upstream concurrently. Each upstream yields exactly one result, carrying
+// either its converted pricing maps or an error message.
+func fetchUpstreamPricing(ctx context.Context, upstreams []dto.UpstreamDTO, timeoutSeconds int) []upstreamResult {
 	var wg sync.WaitGroup
-	ch := make(chan upstreamResult, len(upstreams))
+	results := make([]upstreamResult, len(upstreams))
 
 	sem := make(chan struct{}, maxConcurrentFetches)
 
@@ -286,9 +353,9 @@ func FetchUpstreamRatios(c *gin.Context) {
 	}
 	client := &http.Client{Transport: transport}
 
-	for _, chn := range upstreams {
+	for index, chn := range upstreams {
 		wg.Add(1)
-		go func(chItem dto.UpstreamDTO) {
+		go func(index int, chItem dto.UpstreamDTO) {
 			defer wg.Done()
 
 			sem <- struct{}{}
@@ -317,13 +384,13 @@ func FetchUpstreamRatios(c *gin.Context) {
 				uniqueName = fmt.Sprintf("%s(%d)", chItem.Name, chItem.ID)
 			}
 
-			ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(req.Timeout)*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 			defer cancel()
 
 			httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 			if err != nil {
-				logger.LogWarn(c.Request.Context(), "build request failed: "+err.Error())
-				ch <- upstreamResult{Name: uniqueName, Err: err.Error()}
+				logger.LogWarn(ctx, "build request failed: "+err.Error())
+				results[index] = upstreamResult{Name: uniqueName, Err: err.Error()}
 				return
 			}
 
@@ -331,21 +398,21 @@ func FetchUpstreamRatios(c *gin.Context) {
 			if isOpenRouter && chItem.ID != 0 {
 				dbCh, err := model.GetChannelById(chItem.ID, true)
 				if err != nil {
-					ch <- upstreamResult{Name: uniqueName, Err: "failed to get channel key: " + err.Error()}
+					results[index] = upstreamResult{Name: uniqueName, Err: "failed to get channel key: " + err.Error()}
 					return
 				}
 				key, _, apiErr := dbCh.GetNextEnabledKey()
 				if apiErr != nil {
-					ch <- upstreamResult{Name: uniqueName, Err: "failed to get enabled channel key: " + apiErr.Error()}
+					results[index] = upstreamResult{Name: uniqueName, Err: "failed to get enabled channel key: " + apiErr.Error()}
 					return
 				}
 				if strings.TrimSpace(key) == "" {
-					ch <- upstreamResult{Name: uniqueName, Err: "no API key configured for this channel"}
+					results[index] = upstreamResult{Name: uniqueName, Err: "no API key configured for this channel"}
 					return
 				}
 				httpReq.Header.Set("Authorization", "Bearer "+strings.TrimSpace(key))
 			} else if isOpenRouter {
-				ch <- upstreamResult{Name: uniqueName, Err: "OpenRouter requires a valid channel with API key"}
+				results[index] = upstreamResult{Name: uniqueName, Err: "OpenRouter requires a valid channel with API key"}
 				return
 			}
 
@@ -360,26 +427,26 @@ func FetchUpstreamRatios(c *gin.Context) {
 				time.Sleep(time.Duration(200*(1<<attempt)) * time.Millisecond)
 			}
 			if lastErr != nil {
-				logger.LogWarn(c.Request.Context(), "http error on "+chItem.Name+": "+lastErr.Error())
-				ch <- upstreamResult{Name: uniqueName, Err: lastErr.Error()}
+				logger.LogWarn(ctx, "http error on "+chItem.Name+": "+lastErr.Error())
+				results[index] = upstreamResult{Name: uniqueName, Err: lastErr.Error()}
 				return
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				logger.LogWarn(c.Request.Context(), "non-200 from "+chItem.Name+": "+resp.Status)
-				ch <- upstreamResult{Name: uniqueName, Err: resp.Status}
+				logger.LogWarn(ctx, "non-200 from "+chItem.Name+": "+resp.Status)
+				results[index] = upstreamResult{Name: uniqueName, Err: resp.Status}
 				return
 			}
 
 			// Content-Type 和响应体大小校验
 			if ct := resp.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "application/json") {
-				logger.LogWarn(c.Request.Context(), "unexpected content-type from "+chItem.Name+": "+ct)
+				logger.LogWarn(ctx, "unexpected content-type from "+chItem.Name+": "+ct)
 			}
 			limited := io.LimitReader(resp.Body, maxRatioConfigBytes)
 			bodyBytes, err := io.ReadAll(limited)
 			if err != nil {
-				logger.LogWarn(c.Request.Context(), "read response failed from "+chItem.Name+": "+err.Error())
-				ch <- upstreamResult{Name: uniqueName, Err: err.Error()}
+				logger.LogWarn(ctx, "read response failed from "+chItem.Name+": "+err.Error())
+				results[index] = upstreamResult{Name: uniqueName, Err: err.Error()}
 				return
 			}
 
@@ -387,11 +454,11 @@ func FetchUpstreamRatios(c *gin.Context) {
 			if isOpenRouter {
 				converted, err := convertOpenRouterToRatioData(bytes.NewReader(bodyBytes))
 				if err != nil {
-					logger.LogWarn(c.Request.Context(), "OpenRouter parse failed from "+chItem.Name+": "+err.Error())
-					ch <- upstreamResult{Name: uniqueName, Err: err.Error()}
+					logger.LogWarn(ctx, "OpenRouter parse failed from "+chItem.Name+": "+err.Error())
+					results[index] = upstreamResult{Name: uniqueName, Err: err.Error()}
 					return
 				}
-				ch <- upstreamResult{Name: uniqueName, Data: converted}
+				results[index] = upstreamResult{Name: uniqueName, Data: converted}
 				return
 			}
 
@@ -399,11 +466,11 @@ func FetchUpstreamRatios(c *gin.Context) {
 			if isModelsDev {
 				converted, err := convertModelsDevToRatioData(bytes.NewReader(bodyBytes))
 				if err != nil {
-					logger.LogWarn(c.Request.Context(), "models.dev parse failed from "+chItem.Name+": "+err.Error())
-					ch <- upstreamResult{Name: uniqueName, Err: err.Error()}
+					logger.LogWarn(ctx, "models.dev parse failed from "+chItem.Name+": "+err.Error())
+					results[index] = upstreamResult{Name: uniqueName, Err: err.Error()}
 					return
 				}
-				ch <- upstreamResult{Name: uniqueName, Data: converted}
+				results[index] = upstreamResult{Name: uniqueName, Data: converted}
 				return
 			}
 
@@ -417,13 +484,13 @@ func FetchUpstreamRatios(c *gin.Context) {
 			}
 
 			if err := common.DecodeJson(bytes.NewReader(bodyBytes), &body); err != nil {
-				logger.LogWarn(c.Request.Context(), "json decode failed from "+chItem.Name+": "+err.Error())
-				ch <- upstreamResult{Name: uniqueName, Err: err.Error()}
+				logger.LogWarn(ctx, "json decode failed from "+chItem.Name+": "+err.Error())
+				results[index] = upstreamResult{Name: uniqueName, Err: err.Error()}
 				return
 			}
 
 			if !body.Success {
-				ch <- upstreamResult{Name: uniqueName, Err: body.Message}
+				results[index] = upstreamResult{Name: uniqueName, Err: body.Message}
 				return
 			}
 
@@ -441,7 +508,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 					}
 				}
 				if isType1 {
-					ch <- upstreamResult{Name: uniqueName, Data: type1Data}
+					results[index] = upstreamResult{Name: uniqueName, Data: type1Data}
 					return
 				}
 			}
@@ -462,8 +529,8 @@ func FetchUpstreamRatios(c *gin.Context) {
 				BillingExpr          string   `json:"billing_expr"`
 			}
 			if err := common.Unmarshal(body.Data, &pricingItems); err != nil {
-				logger.LogWarn(c.Request.Context(), "unrecognized data format from "+chItem.Name+": "+err.Error())
-				ch <- upstreamResult{Name: uniqueName, Err: "无法解析上游返回数据"}
+				logger.LogWarn(ctx, "unrecognized data format from "+chItem.Name+": "+err.Error())
+				results[index] = upstreamResult{Name: uniqueName, Err: "无法解析上游返回数据"}
 				return
 			}
 
@@ -563,72 +630,12 @@ func FetchUpstreamRatios(c *gin.Context) {
 				converted[billing_setting.BillingExprField] = valueMap(billingExprMap)
 			}
 
-			ch <- upstreamResult{Name: uniqueName, Data: converted}
-		}(chn)
+			results[index] = upstreamResult{Name: uniqueName, Data: converted}
+		}(index, chn)
 	}
 
 	wg.Wait()
-	close(ch)
-
-	localData := effectivePricingSyncData(getLocalPricingSyncData())
-
-	var testResults []dto.TestResult
-	var successfulChannels []struct {
-		name string
-		data map[string]any
-	}
-
-	for r := range ch {
-		if r.Err != "" {
-			testResults = append(testResults, dto.TestResult{
-				Name:   r.Name,
-				Status: "error",
-				Error:  r.Err,
-			})
-		} else {
-			testResults = append(testResults, dto.TestResult{
-				Name:   r.Name,
-				Status: "success",
-			})
-			successfulChannels = append(successfulChannels, struct {
-				name string
-				data map[string]any
-			}{name: r.Name, data: effectivePricingSyncData(r.Data)})
-		}
-	}
-
-	differences := buildDifferences(localData, successfulChannels)
-	type modelSyncPrices struct {
-		Current   map[string]any            `json:"current"`
-		Upstreams map[string]map[string]any `json:"upstreams"`
-	}
-	prices := make(map[string]modelSyncPrices, len(differences))
-	for name, fields := range differences {
-		row := modelSyncPrices{Current: modelPricingSyncValues(localData, name), Upstreams: make(map[string]map[string]any)}
-		_, expressionPriority := fields[billing_setting.BillingExprField]
-		for _, channel := range successfulChannels {
-			candidate := modelPricingSyncValues(channel.data, name)
-			if expressionPriority && candidate[billing_setting.BillingModeField] != billing_setting.BillingModeTieredExpr {
-				continue
-			}
-			_, hasRatio := candidate["model_ratio"]
-			_, hasPrice := candidate["model_price"]
-			_, hasExpression := candidate[billing_setting.BillingExprField]
-			if hasRatio || hasPrice || hasExpression {
-				row.Upstreams[channel.name] = candidate
-			}
-		}
-		prices[name] = row
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"differences":  differences,
-			"prices":       prices,
-			"test_results": testResults,
-		},
-	})
+	return results
 }
 
 func buildDifferences(localData map[string]any, successfulChannels []struct {

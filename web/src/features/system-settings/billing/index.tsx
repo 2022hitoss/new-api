@@ -113,6 +113,9 @@ const defaultBillingSettings: BillingSettings = {
   'quota_refill_setting.self_refill_enabled': false,
   'quota_refill_setting.self_refill_threshold': 0,
   'quota_refill_setting.self_refill_target': 0,
+  'pricing_auto_sync_setting.enabled': false,
+  'pricing_auto_sync_setting.interval_minutes': 360,
+  'pricing_auto_sync_setting.sources': '[]',
 }
 
 export function BillingSettings() {

@@ -6822,6 +6822,24 @@
     "Preview of new keys": "Предварительный просмотр новых ключей",
     "e.g. abcd": "например, abcd",
     "Only letters, digits and underscores are allowed": "Разрешены только буквы, цифры и подчёркивания",
-    "Must be at most {{count}} characters": "Не более {{count}} символов"
+    "Must be at most {{count}} characters": "Не более {{count}} символов",
+    "Automatic Price Sync": "Автоматическая синхронизация цен",
+    "Automatic price sync": "Автоматическая синхронизация цен",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "При каждом запуске цены загружаются из источников ниже и перезаписывают локальную цену каждой модели, обслуживаемой включённым каналом, включая цены, заданные вручную. Модели, которые есть только у источника, не импортируются.",
+    "Enable automatic price sync": "Включить автоматическую синхронизацию цен",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "Синхронизировать цены с источником по расписанию, чтобы новые модели получали цены автоматически.",
+    "Sync interval (minutes)": "Интервал синхронизации (минуты)",
+    "Interval must be between {{min}} and {{max}} minutes": "Интервал должен быть от {{min}} до {{max}} минут",
+    "Sync sources": "Источники синхронизации",
+    "For each model, the first source in this list that has a price wins.": "Для каждой модели используется первый источник в списке, у которого есть цена.",
+    "Select sources": "Выбрать источники",
+    "Sync now": "Синхронизировать сейчас",
+    "Save changes before syncing": "Сохраните изменения перед синхронизацией",
+    "No sync sources": "Нет источников синхронизации",
+    "Select at least one channel or pricing preset to sync from.": "Выберите хотя бы один канал или пресет цен в качестве источника.",
+    "Default endpoint": "Эндпоинт по умолчанию",
+    "Unknown channel": "Неизвестный канал",
+    "Price sync started. Check System Tasks for the result.": "Синхронизация цен запущена. Результат смотрите в системных задачах.",
+    "Failed to start price sync": "Не удалось запустить синхронизацию цен"
   }
 }

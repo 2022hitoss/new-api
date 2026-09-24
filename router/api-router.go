@@ -251,6 +251,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
+			ratioSyncRoute.POST("/auto/run", controller.TriggerPricingAutoSync)
 		}
 		taskPluginRoute := apiRouter.Group("/plugin/task")
 		taskPluginRoute.Use(middleware.RootAuth())

@@ -25,6 +25,7 @@ import { PaymentSettingsSection } from '../integrations/payment-settings-section
 import { RatioSettingsCard } from '../models/ratio-settings-card'
 import type { BillingSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { PricingAutoSyncSettingsSection } from './pricing-auto-sync-settings-section'
 import { QuotaRefillSettingsSection } from './quota-refill-settings-section'
 
 const getModelDefaults = (settings: BillingSettings) => ({
@@ -113,6 +114,20 @@ const BILLING_SECTIONS = [
         groupDefaults={getGroupDefaults(settings)}
         toolPricesDefault={settings['tool_price_setting.prices']}
         visibleTabs={['models', 'unset-models', 'tool-prices', 'upstream-sync']}
+      />
+    ),
+  },
+  {
+    id: 'pricing-auto-sync',
+    titleKey: 'Automatic Price Sync',
+    build: (settings: BillingSettings) => (
+      <PricingAutoSyncSettingsSection
+        defaultValues={{
+          enabled: settings['pricing_auto_sync_setting.enabled'],
+          intervalMinutes:
+            settings['pricing_auto_sync_setting.interval_minutes'],
+          sources: settings['pricing_auto_sync_setting.sources'],
+        }}
       />
     ),
   },

@@ -6822,6 +6822,24 @@
     "Preview of new keys": "Aperçu des nouvelles clés",
     "e.g. abcd": "ex. abcd",
     "Only letters, digits and underscores are allowed": "Seuls les lettres, chiffres et tirets bas sont autorisés",
-    "Must be at most {{count}} characters": "Doit contenir au plus {{count}} caractères"
+    "Must be at most {{count}} characters": "Doit contenir au plus {{count}} caractères",
+    "Automatic Price Sync": "Synchronisation automatique des prix",
+    "Automatic price sync": "Synchronisation automatique des prix",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "Chaque exécution récupère les prix depuis les sources ci-dessous et écrase le prix local de chaque modèle servi par un canal activé, y compris les prix définis manuellement. Les modèles qui n'existent qu'en amont ne sont pas importés.",
+    "Enable automatic price sync": "Activer la synchronisation automatique des prix",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "Synchronise les prix depuis l'amont selon un calendrier afin que les nouveaux modèles soient tarifés automatiquement.",
+    "Sync interval (minutes)": "Intervalle de synchronisation (minutes)",
+    "Interval must be between {{min}} and {{max}} minutes": "L'intervalle doit être compris entre {{min}} et {{max}} minutes",
+    "Sync sources": "Sources de synchronisation",
+    "For each model, the first source in this list that has a price wins.": "Pour chaque modèle, la première source de cette liste qui fournit un prix est retenue.",
+    "Select sources": "Choisir les sources",
+    "Sync now": "Synchroniser maintenant",
+    "Save changes before syncing": "Enregistrez les modifications avant de synchroniser",
+    "No sync sources": "Aucune source de synchronisation",
+    "Select at least one channel or pricing preset to sync from.": "Sélectionnez au moins un canal ou un préréglage de prix comme source.",
+    "Default endpoint": "Point de terminaison par défaut",
+    "Unknown channel": "Canal inconnu",
+    "Price sync started. Check System Tasks for the result.": "Synchronisation des prix lancée. Consultez les tâches système pour le résultat.",
+    "Failed to start price sync": "Impossible de lancer la synchronisation des prix"
   }
 }

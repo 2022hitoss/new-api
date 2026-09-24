@@ -25,4 +25,5 @@ export const SYSTEM_TASK_TYPE_LABEL: Record<string, string> = {
   midjourney_poll: 'Drawing task polling',
   async_task_poll: 'Async task polling',
   monthly_quota_reset: 'Monthly quota reset',
+  pricing_auto_sync: 'Automatic price sync',
 }

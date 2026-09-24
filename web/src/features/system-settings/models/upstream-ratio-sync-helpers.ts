@@ -21,12 +21,17 @@ import { createContext, useContext } from 'react'
 import { BILLING_PRICING_VARS, splitBillingExprAndRequestRules } from '@/features/pricing/lib/billing-expr'
 import { tryParseVisualConfig } from '@/features/pricing/lib/tier-expr'
 
-import type { PricingSyncValues } from '../types'
+import type { PricingSyncValues, UpstreamChannel } from '../types'
 import {
+  DEFAULT_ENDPOINT,
+  OFFICIAL_CHANNEL_ENDPOINT,
   OFFICIAL_CHANNEL_ID,
   OFFICIAL_CHANNEL_NAME,
+  MODELS_DEV_PRESET_ENDPOINT,
   MODELS_DEV_PRESET_ID,
   MODELS_DEV_PRESET_NAME,
+  OPENROUTER_CHANNEL_TYPE,
+  OPENROUTER_ENDPOINT,
 } from './constants'
 import { formatPricingNumber } from './pricing-format'
 
@@ -50,6 +55,13 @@ export function getUpstreamDisplayName(
     return t('models.dev pricing preset')
   }
   return sourceName
+}
+
+export function getDefaultEndpointForChannel(channel: UpstreamChannel): string {
+  if (channel.id === MODELS_DEV_PRESET_ID) return MODELS_DEV_PRESET_ENDPOINT
+  if (channel.id === OFFICIAL_CHANNEL_ID) return OFFICIAL_CHANNEL_ENDPOINT
+  if (channel.type === OPENROUTER_CHANNEL_TYPE) return OPENROUTER_ENDPOINT
+  return DEFAULT_ENDPOINT
 }
 
 export function getSyncPriceKind(

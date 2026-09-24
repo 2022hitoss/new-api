@@ -6822,6 +6822,24 @@
     "Preview of new keys": "新しいキーのプレビュー",
     "e.g. abcd": "例: abcd",
     "Only letters, digits and underscores are allowed": "英数字とアンダースコアのみ使用できます",
-    "Must be at most {{count}} characters": "{{count}} 文字以内で入力してください"
+    "Must be at most {{count}} characters": "{{count}} 文字以内で入力してください",
+    "Automatic Price Sync": "価格の自動同期",
+    "Automatic price sync": "価格の自動同期",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "実行のたびに下記のソースから価格を取得し、有効なチャネルが提供するすべてのモデルのローカル価格を上書きします（手動で設定した価格も含む）。上流にのみ存在するモデルはインポートされません。",
+    "Enable automatic price sync": "価格の自動同期を有効にする",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "スケジュールに従って上流から価格を同期し、新しいモデルに自動で価格を設定します。",
+    "Sync interval (minutes)": "同期間隔（分）",
+    "Interval must be between {{min}} and {{max}} minutes": "間隔は {{min}}〜{{max}} 分の範囲で指定してください",
+    "Sync sources": "同期ソース",
+    "For each model, the first source in this list that has a price wins.": "各モデルについて、このリストで最初に価格を持つソースが採用されます。",
+    "Select sources": "ソースを選択",
+    "Sync now": "今すぐ同期",
+    "Save changes before syncing": "同期する前に変更を保存してください",
+    "No sync sources": "同期ソースがありません",
+    "Select at least one channel or pricing preset to sync from.": "同期元としてチャネルまたは価格プリセットを 1 つ以上選択してください。",
+    "Default endpoint": "デフォルトのエンドポイント",
+    "Unknown channel": "不明なチャネル",
+    "Price sync started. Check System Tasks for the result.": "価格の同期を開始しました。結果はシステムタスクで確認してください。",
+    "Failed to start price sync": "価格の同期を開始できませんでした"
   }
 }

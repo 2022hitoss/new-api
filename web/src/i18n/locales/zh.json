@@ -6822,6 +6822,24 @@
     "Preview of new keys": "新密钥预览",
     "e.g. abcd": "例如 abcd",
     "Only letters, digits and underscores are allowed": "仅允许字母、数字和下划线",
-    "Must be at most {{count}} characters": "最多 {{count}} 个字符"
+    "Must be at most {{count}} characters": "最多 {{count}} 个字符",
+    "Automatic Price Sync": "自动价格同步",
+    "Automatic price sync": "自动价格同步",
+    "Each run fetches prices from the sources below and overwrites the local price of every model served by an enabled channel, including prices set manually. Models that only exist upstream are not imported.": "每次运行都会从下方来源拉取价格，并覆盖所有已启用渠道所提供模型的本地价格，包括手动设置的价格。仅存在于上游的模型不会被导入。",
+    "Enable automatic price sync": "启用自动价格同步",
+    "Sync prices from upstream on a schedule so new models are priced automatically.": "按计划从上游同步价格，让新模型自动获得定价。",
+    "Sync interval (minutes)": "同步间隔（分钟）",
+    "Interval must be between {{min}} and {{max}} minutes": "间隔必须在 {{min}} 到 {{max}} 分钟之间",
+    "Sync sources": "同步来源",
+    "For each model, the first source in this list that has a price wins.": "对每个模型，使用列表中第一个提供价格的来源。",
+    "Select sources": "选择来源",
+    "Sync now": "立即同步",
+    "Save changes before syncing": "请先保存更改再同步",
+    "No sync sources": "暂无同步来源",
+    "Select at least one channel or pricing preset to sync from.": "请至少选择一个渠道或价格预设作为同步来源。",
+    "Default endpoint": "默认端点",
+    "Unknown channel": "未知渠道",
+    "Price sync started. Check System Tasks for the result.": "价格同步已开始，请在系统任务中查看结果。",
+    "Failed to start price sync": "启动价格同步失败"
   }
 }
